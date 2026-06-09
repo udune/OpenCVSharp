@@ -28,17 +28,18 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.pictureBoxIpl1 = new OpenCvSharp.UserInterface.PictureBoxIpl();
+            this.pictureBoxIpl1 = new System.Windows.Forms.PictureBox();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBoxIpl1)).BeginInit();
             this.SuspendLayout();
             // 
             // pictureBoxIpl1
             // 
-            this.pictureBoxIpl1.Location = new System.Drawing.Point(0, 0);
+            this.pictureBoxIpl1.Location = new System.Drawing.Point(41, 31);
             this.pictureBoxIpl1.Name = "pictureBoxIpl1";
-            this.pictureBoxIpl1.Size = new System.Drawing.Size(769, 401);
+            this.pictureBoxIpl1.Size = new System.Drawing.Size(635, 368);
             this.pictureBoxIpl1.TabIndex = 0;
             this.pictureBoxIpl1.TabStop = false;
+            this.pictureBoxIpl1.Click += new System.EventHandler(this.pictureBoxIpl1_Click);
             // 
             // Form1
             // 
@@ -55,7 +56,7 @@
 
         #endregion
 
-        private OpenCvSharp.UserInterface.PictureBoxIpl pictureBoxIpl1;
+        private System.Windows.Forms.PictureBox pictureBoxIpl1;
     }
 }
 

@@ -16,5 +16,10 @@ namespace OpenCVSharp
         {
             InitializeComponent();
         }
+
+        private void pictureBoxIpl1_Click(object sender, EventArgs e)
+        {
+
+        }
     }
 }
