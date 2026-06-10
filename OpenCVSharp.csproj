@@ -68,17 +68,20 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Form1.cs">
+    <Compile Include="ChapterSelectorForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Form1.Designer.cs">
-      <DependentUpon>Form1.cs</DependentUpon>
+    <Compile Include="FormCh02.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormCh03.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormCh04.cs">
+      <SubType>Form</SubType>
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <EmbeddedResource Include="Form1.resx">
-      <DependentUpon>Form1.cs</DependentUpon>
-    </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
@@ -89,10 +92,7 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <None Include=".github\copilot-instructions.md" />
-    <None Include="docs\chapters\ch01-image-size-fps.md" />
-    <None Include="docs\chapters\ch02-camera-output.md" />
     <None Include="docs\chapters\README.md" />
-    <None Include="docs\chapters\_template.md" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -108,6 +108,11 @@
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Connected Services\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="ref\002 Image Size &amp; FPS.png" />
+    <Content Include="ref\003 Camera 출력.png" />
+    <Content Include="ref\004 동영상 파일 출력.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
