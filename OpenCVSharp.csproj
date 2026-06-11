@@ -80,6 +80,9 @@
     <Compile Include="FormCh04.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="FormCh05.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="Properties\Resources.resx">
@@ -113,6 +116,7 @@
     <Content Include="ref\002 Image Size &amp; FPS.png" />
     <Content Include="ref\003 Camera 출력.png" />
     <Content Include="ref\004 동영상 파일 출력.png" />
+    <Content Include="ref\005 이미지 파일 출력.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
