@@ -14,8 +14,23 @@ namespace OpenCVSharp
     public class FormCh04 : Form
     {
         private readonly TabControl tabControl = new TabControl();
+        private readonly TabPage tabTheory = new TabPage();
         private readonly TabPage tabPlayback = new TabPage();
         private readonly TabPage tabRecord = new TabPage();
+
+        // --- Theory Tab Controls ---
+        private readonly GroupBox grpQuiz1 = new GroupBox();
+        private readonly RadioButton rdoQ1O = new RadioButton();
+        private readonly RadioButton rdoQ1X = new RadioButton();
+        private readonly Label lblQ1Result = new Label();
+
+        private readonly GroupBox grpQuiz2 = new GroupBox();
+        private readonly RadioButton rdoQ2O = new RadioButton();
+        private readonly RadioButton rdoQ2X = new RadioButton();
+        private readonly Label lblQ2Result = new Label();
+
+        private readonly Button btnCheckAnswers = new Button();
+        private readonly Button btnGoToPlayback = new Button();
 
         // --- Playback Tab ---
         private readonly PictureBox pbPlay = new PictureBox();
@@ -33,6 +48,7 @@ namespace OpenCVSharp
         private int playTotalFrames;
         private double playFps;
         private bool isTracking;
+        private readonly PictureBox picDiagram = new PictureBox();
 
         // --- Record Tab ---
         private readonly PictureBox pbRec = new PictureBox();
@@ -53,20 +69,269 @@ namespace OpenCVSharp
 
         public FormCh04()
         {
-            Text = "CH04 - 동영상 파일 출력 (재생/저장) 실습";
+            Text = "CH04 - 동영상 파일 출력 (재생/저장) 학습 및 실습";
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(1100, 640);
+            ClientSize = new Size(1200, 740);
             Font = new Font("Malgun Gothic", 9F, FontStyle.Regular);
 
             tabControl.Dock = DockStyle.Fill;
-            tabPlayback.Text = "동영상 파일 재생 (Screen Output)";
-            tabRecord.Text = "동영상 파일 저장 (File Output)";
+            tabTheory.Text = "📚 1. 핵심 이론 및 자가진단 퀴즈";
+            tabTheory.BackColor = Color.White;
+            tabPlayback.Text = "🧪 2. 동영상 파일 재생 (Playback Lab)";
+            tabPlayback.BackColor = Color.FromArgb(240, 244, 248);
+            tabRecord.Text = "🧪 3. 동영상 파일 저장 (Record Lab)";
+            tabRecord.BackColor = Color.FromArgb(248, 240, 244);
+
+            tabControl.Controls.Add(tabTheory);
             tabControl.Controls.Add(tabPlayback);
             tabControl.Controls.Add(tabRecord);
             Controls.Add(tabControl);
 
+            InitializeTheoryTab();
             InitializePlaybackTab();
             InitializeRecordTab();
+        }
+
+        private void InitializeTheoryTab()
+        {
+            // Title Header
+            var lblTitle = new Label
+            {
+                Text = "004. 동영상 재생(디코딩) & 저장(인코딩) 핵심 이론 학습",
+                Font = new Font("Malgun Gothic", 14F, FontStyle.Bold),
+                Location = new Point(20, 20),
+                AutoSize = true,
+                ForeColor = Color.DarkSlateBlue
+            };
+            tabTheory.Controls.Add(lblTitle);
+
+            // Theory Text Box
+            var txtTheoryText = new TextBox
+            {
+                Multiline = true,
+                ReadOnly = true,
+                ScrollBars = ScrollBars.Vertical,
+                Location = new Point(20, 60),
+                Size = new Size(550, 280),
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.FromArgb(252, 252, 248),
+                Font = new Font("Malgun Gothic", 10F),
+                Text = "■ [동영상 압축 풀기 및 재생 (CvCapture.FromFile)]\r\n" +
+                       "우리가 보는 동영상 파일(mp4, avi 등)은 컴퓨터 하드디스크 용량을 아끼기 위해 사진 수천 장을 꽉꽉 쪼그려뜨려서 압축(코덱 사용)한 뒤 상자(파일)에 포장해 둔 것입니다.\r\n" +
+                       "  - 비디오 상자 열기: playCapture = CvCapture.FromFile(filepath);\r\n" +
+                       "  - FromFile()은 동영상 파일을 열어 사진 압축을 풀 준비를 하는 함수입니다.\r\n" +
+                       "  - 재생 원리: 타이머 주기에 맞춰 QueryFrame()을 계속 호출하면, 압축이 풀려 나타난 깨끗한 사진 한 장(IplImage)을 순서대로 가져와 비트맵으로 바꾼 뒤 눈앞에 연속해서 띄워 줍니다.\r\n\r\n" +
+                       "※ 내가 원하는 장면으로 이동하기 (Seek):\r\n" +
+                       "  - 트랙바를 마우스로 잡고 끌면, `capture.SetCaptureProperty(CaptureProperty.PosFrames, frameIndex)` 함수를 통해 카메라 읽기 헤드를 내가 지정한 프레임 번호 위치로 순간 이동(Seek) 시킬 수 있습니다.\r\n\r\n" +
+                       "--------------------------------------------------\r\n\r\n" +
+                       "■ [사진들을 엮어서 비디오 파일로 만들기 (CvVideoWriter)]\r\n" +
+                       "카메라나 실습 화면의 연속된 정지 사진들을 엮어서 하나의 완성된 비디오 파일로 만드는 기술입니다.\r\n" +
+                       "  - 저장 준비: writer = new CvVideoWriter(경로, 코덱종류, FPS, 크기);\r\n" +
+                       "    - 코덱종류: XVID, DIVX, MJPG 등 4글자의 압축 알고리즘 기법 이름(FourCC)을 지정합니다.\r\n" +
+                       "    - FPS / 크기: 완성할 동영상의 속도(예: 30 FPS)와 화면 해상도 정보를 줍니다.\r\n" +
+                       "  - 프레임 주입: writer.WriteFrame(iplImage) 함수로 매 순간의 사진을 비디오 스트림에 하나씩 밀어 넣습니다.\r\n\r\n" +
+                       "※ 주의: 다 만들었으면 꼭 상자 뚜껑 닫기 (Dispose)\r\n" +
+                       "  - 녹화가 다 끝나면 반드시 `writer.Dispose()`를 실행해 상자 파일의 뚜껑을 꽉 닫아 줘야 합니다.\r\n" +
+                       "  - 뚜껑을 닫을 때 비디오 파일 내부의 헤더 정보(재생 시간, 규격 등)와 색인이 최종 기록되는데, 만약 닫지 않고 강제 종료하면 재생되지 않는 빈 깡통 파일(0바이트 등)이 남게 됩니다."
+             };
+            tabTheory.Controls.Add(txtTheoryText);
+
+            // Quiz Section Panel
+            var pnlQuiz = new Panel
+            {
+                Location = new Point(20, 360),
+                Size = new Size(550, 330),
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.FromArgb(245, 245, 250)
+            };
+            tabTheory.Controls.Add(pnlQuiz);
+
+            var lblQuizTitle = new Label
+            {
+                Text = "✍ 자가 진단 퀴즈 (이론 검증)",
+                Font = new Font("Malgun Gothic", 11F, FontStyle.Bold),
+                Location = new Point(15, 10),
+                AutoSize = true,
+                ForeColor = Color.DarkBlue
+            };
+            pnlQuiz.Controls.Add(lblQuizTitle);
+
+            // Quiz 1
+            grpQuiz1.Text = "질문 1. 동영상 임의 프레임 이동 (Seek)";
+            grpQuiz1.Font = new Font("Malgun Gothic", 9F, FontStyle.Bold);
+            grpQuiz1.Location = new Point(10, 35);
+            grpQuiz1.Size = new Size(530, 100);
+            pnlQuiz.Controls.Add(grpQuiz1);
+
+            var txtQ1Text = new TextBox
+            {
+                Text = "동영상 재생 도중 트랙바를 드래그하여 임의의 시간대나 프레임 번호로 즉시 재생 화면을 이동시키는 동작(Seek)은 OpenCV에서 PosFrames 속성을 세팅하여 구현할 수 있다.",
+                Font = new Font("Malgun Gothic", 9F, FontStyle.Regular),
+                Location = new Point(10, 20),
+                Size = new Size(510, 40),
+                Multiline = true,
+                ReadOnly = true,
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(245, 245, 250)
+            };
+            grpQuiz1.Controls.Add(txtQ1Text);
+
+            rdoQ1O.Text = "O (참)";
+            rdoQ1O.Location = new Point(20, 65);
+            rdoQ1O.Size = new Size(80, 20);
+            rdoQ1O.Font = new Font("Malgun Gothic", 9F, FontStyle.Regular);
+            grpQuiz1.Controls.Add(rdoQ1O);
+
+            rdoQ1X.Text = "X (거짓)";
+            rdoQ1X.Location = new Point(120, 65);
+            rdoQ1X.Size = new Size(80, 20);
+            rdoQ1X.Font = new Font("Malgun Gothic", 9F, FontStyle.Regular);
+            grpQuiz1.Controls.Add(rdoQ1X);
+
+            lblQ1Result.Location = new Point(220, 65);
+            lblQ1Result.Size = new Size(300, 25);
+            lblQ1Result.Font = new Font("Malgun Gothic", 8.5F, FontStyle.Regular);
+            lblQ1Result.ForeColor = Color.DarkGray;
+            lblQ1Result.Text = "정답 확인 시 해설이 여기에 표시됩니다.";
+            grpQuiz1.Controls.Add(lblQ1Result);
+
+            // Quiz 2
+            grpQuiz2.Text = "질문 2. CvVideoWriter 객체 해제 완료와 파일";
+            grpQuiz2.Font = new Font("Malgun Gothic", 9F, FontStyle.Bold);
+            grpQuiz2.Location = new Point(10, 140);
+            grpQuiz2.Size = new Size(530, 100);
+            pnlQuiz.Controls.Add(grpQuiz2);
+
+            var txtQ2Text = new TextBox
+            {
+                Text = "CvVideoWriter 객체를 통해 카메라의 녹화 프레임을 다 쓴 이후에는 Dispose()를 하지 않고 그냥 프로그램을 강제로 종료해도 비디오 파일이 안전하게 완전히 생성된다.",
+                Font = new Font("Malgun Gothic", 9F, FontStyle.Regular),
+                Location = new Point(10, 20),
+                Size = new Size(510, 40),
+                Multiline = true,
+                ReadOnly = true,
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(245, 245, 250)
+            };
+            grpQuiz2.Controls.Add(txtQ2Text);
+
+            rdoQ2O.Text = "O (참)";
+            rdoQ2O.Location = new Point(20, 65);
+            rdoQ2O.Size = new Size(80, 20);
+            rdoQ2O.Font = new Font("Malgun Gothic", 9F, FontStyle.Regular);
+            grpQuiz2.Controls.Add(rdoQ2O);
+
+            rdoQ2X.Text = "X (거짓)";
+            rdoQ2X.Location = new Point(120, 65);
+            rdoQ2X.Size = new Size(80, 20);
+            rdoQ2X.Font = new Font("Malgun Gothic", 9F, FontStyle.Regular);
+            grpQuiz2.Controls.Add(rdoQ2X);
+
+            lblQ2Result.Location = new Point(220, 65);
+            lblQ2Result.Size = new Size(300, 25);
+            lblQ2Result.Font = new Font("Malgun Gothic", 8.5F, FontStyle.Regular);
+            lblQ2Result.ForeColor = Color.DarkGray;
+            lblQ2Result.Text = "정답 확인 시 해설이 여기에 표시됩니다.";
+            grpQuiz2.Controls.Add(lblQ2Result);
+
+            // Check Answers Button
+            btnCheckAnswers.Text = "정답 확인 및 해설 보기";
+            btnCheckAnswers.Location = new Point(10, 245);
+            btnCheckAnswers.Size = new Size(530, 35);
+            btnCheckAnswers.Font = new Font("Malgun Gothic", 10F, FontStyle.Bold);
+            btnCheckAnswers.BackColor = Color.SteelBlue;
+            btnCheckAnswers.ForeColor = Color.White;
+            btnCheckAnswers.FlatStyle = FlatStyle.Flat;
+            btnCheckAnswers.Click += BtnCheckAnswers_Click;
+            pnlQuiz.Controls.Add(btnCheckAnswers);
+
+            // Go to Playback Button
+            btnGoToPlayback.Text = "실습 실험실로 이동하기 (Go to Lab) ▶";
+            btnGoToPlayback.Location = new Point(10, 285);
+            btnGoToPlayback.Size = new Size(530, 38);
+            btnGoToPlayback.Font = new Font("Malgun Gothic", 11F, FontStyle.Bold);
+            btnGoToPlayback.BackColor = Color.ForestGreen;
+            btnGoToPlayback.ForeColor = Color.White;
+            btnGoToPlayback.FlatStyle = FlatStyle.Flat;
+            btnGoToPlayback.Click += (s, e) => tabControl.SelectedTab = tabPlayback;
+            pnlQuiz.Controls.Add(btnGoToPlayback);
+
+            // --- Right Side Infographic Diagram Area ---
+            var lblDiagramTitle = new Label
+            {
+                Text = "🖼 시각 자료: 동영상 생명 주기 (인코딩 및 디코딩)",
+                Font = new Font("Malgun Gothic", 11F, FontStyle.Bold),
+                Location = new Point(590, 20),
+                AutoSize = true,
+                ForeColor = Color.DarkBlue
+            };
+            tabTheory.Controls.Add(lblDiagramTitle);
+
+            picDiagram.Location = new Point(590, 45);
+            picDiagram.Size = new Size(580, 480);
+            picDiagram.SizeMode = PictureBoxSizeMode.Zoom;
+            picDiagram.BorderStyle = BorderStyle.FixedSingle;
+            picDiagram.BackColor = Color.FromArgb(20, 20, 20);
+            string imgPath = GetImagePath("ch04_video_lifecycle_ko.png");
+            if (imgPath != null)
+            {
+                picDiagram.Image = Image.FromFile(imgPath);
+            }
+            tabTheory.Controls.Add(picDiagram);
+
+            var txtDiagramDesc = new TextBox
+            {
+                Multiline = true,
+                ReadOnly = true,
+                ScrollBars = ScrollBars.Vertical,
+                Location = new Point(590, 535),
+                Size = new Size(580, 150),
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.FromArgb(250, 250, 252),
+                Font = new Font("Malgun Gothic", 9.5F),
+                Text = "【인포그래픽 설명】\r\n" +
+                       "1. 동영상 디코딩(재생) 파이프라인: 파일로부터 데이터를 로드(FromFile)하여 디코더를 초기화합니다. 이후 프레임을 순차적으로 읽고(QueryFrame), 비트맵으로 변환해 화면에 렌더링(Show)하는 주기를 거칩니다. PosFrames 제어로 임의의 프레임 위치로 이동(Seek)할 수도 있습니다.\r\n" +
+                       "2. 동영상 인코딩(저장) 파이프라인: 저장 대상 파일명, 코덱(FourCC), FPS, 프레임 해상도를 지정해 VideoWriter 인코더를 초기화합니다. 가공 및 리사이징된 이미지를 스트림에 연속으로 기록(WriteFrame)하고, 녹화가 끝나면 반드시 해제(Dispose)를 거쳐 완성합니다.\r\n" +
+                       "3. 주의사항: 인코더를 수동으로 닫아주지(Dispose) 않으면, 비디오 파일의 메타데이터와 프레임 인덱스 목록이 올바르게 하드디스크에 써지지 않아 재생이 불가능한 손상된 0바이트 파일이 남습니다."
+            };
+            tabTheory.Controls.Add(txtDiagramDesc);
+        }
+
+        private void BtnCheckAnswers_Click(object sender, EventArgs e)
+        {
+            // Q1 Check (Answer: O)
+            if (rdoQ1O.Checked)
+            {
+                lblQ1Result.ForeColor = Color.Green;
+                lblQ1Result.Text = "정답! PosFrames 속성을 세팅해 해당 특정 프레임으로 재생 인덱스를 강제 이동(Seek) 시키는 원리입니다.";
+            }
+            else if (rdoQ1X.Checked)
+            {
+                lblQ1Result.ForeColor = Color.Red;
+                lblQ1Result.Text = "오답입니다. PosFrames 속성을 조절해 Seek 동작을 연동하는 구조가 컴퓨터 비전의 기초입니다.";
+            }
+            else
+            {
+                lblQ1Result.ForeColor = Color.OrangeRed;
+                lblQ1Result.Text = "답안을 먼저 체크해 주세요.";
+            }
+
+            // Q2 Check (Answer: X)
+            if (rdoQ2X.Checked)
+            {
+                lblQ2Result.ForeColor = Color.Green;
+                lblQ2Result.Text = "정답! 인코더 객체를 닫을 때(Dispose) 파일 포맷 인덱스와 파일 헤더가 최종 기록되므로 닫아주지 않으면 비디오 파일이 깨집니다.";
+            }
+            else if (rdoQ2O.Checked)
+            {
+                lblQ2Result.ForeColor = Color.Red;
+                lblQ2Result.Text = "오답입니다. 스트림 마무리 처리가 되지 않으면 컨테이너 규격상 재생이 되지 않는 비정상 파일이 됩니다.";
+            }
+            else
+            {
+                lblQ2Result.ForeColor = Color.OrangeRed;
+                lblQ2Result.Text = "답안을 먼저 체크해 주세요.";
+            }
         }
 
         // =====================================================================
@@ -545,14 +810,16 @@ namespace OpenCVSharp
                        "   - 라이터 객체를 닫을 때 파일 헤더 정보와 인덱스가 완전하게 기록되어 재생 가능한 정상 비디오가 됩니다."
             });
 
-            tabRecord.Controls.Add(new Label
+            tabRecord.Controls.Add(new TextBox
             {
                 Text = "실습 가이드: 녹화 시작 시 대화상자에서 저장할 경로를 정한 후 녹화를 시작할 수 있습니다.",
                 Location = new Point(20, 520),
-                Size = new Size(720, 40),
-                BorderStyle = BorderStyle.Fixed3D,
+                Size = new Size(720, 45),
+                Multiline = true,
+                ReadOnly = true,
+                BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.LightYellow,
-                Padding = new Padding(5)
+                Font = new Font("Malgun Gothic", 9.5F)
             });
 
             recTimer.Interval = 33;
@@ -688,12 +955,23 @@ namespace OpenCVSharp
             lblRecInfo.Text = $"저장 프레임 수: {recFrameCount} | 크기: {fileSizeKB:N0} KB";
         }
 
+        private string GetImagePath(string filename)
+        {
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, filename);
+            if (!File.Exists(path))
+            {
+                path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\" + filename);
+            }
+            return File.Exists(path) ? path : null;
+        }
+
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             StopPlayback();
             StopRecording();
             playTimer.Dispose();
             recTimer.Dispose();
+            picDiagram.Image?.Dispose();
             base.OnFormClosed(e);
         }
     }
