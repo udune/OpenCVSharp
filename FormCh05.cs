@@ -57,9 +57,15 @@ namespace OpenCVSharp
         private readonly Panel pnlLeakedBg = new Panel();
         private readonly Panel pnlLeakedFill = new Panel();
 
+        // New Managed Memory Visuals
+        private readonly Label lblManagedMemInfo = new Label();
+        private readonly Panel pnlManagedBg = new Panel();
+        private readonly Panel pnlManagedFill = new Panel();
+
         private readonly Label lblWarning = new Label();
         private readonly Button btnResetLeaks = new Button();
         private readonly Button btnFreeNow = new Button();
+        private readonly Button btnRunGC = new Button(); // GC.Collect Trigger
 
         // Settings and Info
         private readonly ComboBox cmbSizeMode = new ComboBox();
@@ -110,36 +116,38 @@ namespace OpenCVSharp
             tabTheory.Controls.Add(lblTitle);
 
             // Theory Text Box
-            var txtTheoryText = new TextBox
+            var txtTheoryText = new RichTextBox
             {
                 Multiline = true,
                 ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
+                ScrollBars = RichTextBoxScrollBars.Vertical,
                 Location = new Point(20, 60),
                 Size = new Size(550, 280),
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.FromArgb(252, 252, 248),
-                Font = new Font("Malgun Gothic", 10F),
-                Text = "■ [컴퓨터 방 청소기와 외부 창고 (네이티브 메모리)]\r\n" +
-                       "C# 언어는 컴퓨터가 알아서 메모리 방 청소를 해 주는 '가비지 컬렉터(청소기)'를 가지고 있어 무척 편리합니다.\r\n" +
-                       "하지만 OpenCV는 원래 C++ 언어로 만들어진 외부 도구이기 때문에, 메모리를 쓰는 구역이 다릅니다.\r\n\r\n" +
-                       "  - 도서관 대출 대장과 외부 창고:\r\n" +
-                       "    C#의 청소기(GC)는 자기 도서관 책상 위의 얇은 '대출 대장(C# 객체 변수)'만 찾아내 치워 줍니다.\r\n" +
-                       "    하지만 실제 거대하고 무거운 '도서 박스(C++ 원본 픽셀 데이터)'는 저 멀리 떨어진 **외부 창고(비관리 네이티브 힙)**에 보관됩니다.\r\n" +
-                       "  - 수동 반납 필수: 외부 창고에 직접 들어간 도서 박스는 C# 청소기가 건드릴 수 없습니다. 따라서 사진을 다 봤다면 개발자가 직접 `Dispose()` 또는 `ReleaseImage()`를 호출해서 '이 책 반납할게요!'라고 명시적으로 창고 박스를 비워 주어야 합니다.\r\n\r\n" +
-                       "--------------------------------------------------\r\n\r\n" +
-                       "■ [메모리 누수(Memory Leak)가 생기는 원리]\r\n" +
-                       "  - C# 변수 `src = new IplImage(...)`로 새 사진을 가져오면 외부 창고에 박스가 하나 생깁니다.\r\n" +
-                       "  - 이 사진을 다 쓴 뒤에 반납 처리를 하지 않고, 그냥 똑같은 변수에 다시 새 이미지(`src = new IplImage(...)`)를 덮어쓰게 되면:\r\n" +
-                       "    1. 변수 `src`는 새로 만든 상자만 가리키게 되며, 이전 상자의 열쇠(참조 포인터)를 잃어버립니다.\r\n" +
-                       "    2. 열쇠가 없어진 이전 도서 박스는 외부 창고 구석에 갇힌 채 영원히 버릴 수도, 찾을 수도 없는 미아 상태가 됩니다.\r\n" +
-                       "    3. 이것이 계속 반복되어 외부 창고에 버려진 박스들이 가득 차 결국 컴퓨터 메모리가 통째로 꽉 차서 뻗어버리는 현상(Out of Memory)을 바로 **메모리 누수(Memory Leak)**라고 합니다.\r\n\r\n" +
-                       "--------------------------------------------------\r\n\r\n" +
-                       "■ [액자 컨트롤(PictureBoxIpl)의 함정]\r\n" +
-                       "  - PictureBoxIpl은 단지 외부 창고에 있는 이미지를 액자에 넣어 거실에 보여주는 조수 역할을 합니다.\r\n" +
-                       "  - 액자에 새 사진을 끼워 넣는다고 해서, 액자 조수가 알아서 예전 사진 원본(네이티브 메모리)을 버려주지는 않습니다. 액자 사용이 끝났을 때 원본 이미지를 수동으로 지워 주는 주체는 항상 개발자 자신이어야 합니다."
+                Font = new Font("Malgun Gothic", 10F)
             };
             tabTheory.Controls.Add(txtTheoryText);
+
+            string theoryText = "■ [컴퓨터 방 청소기와 외부 창고 (네이티브 메모리)]\r\n" +
+                               "C# 언어는 컴퓨터가 알아서 메모리 방 청소를 해 주는 '가비지 컬렉터(청소기)'를 가지고 있어 무척 편리합니다.\r\n" +
+                               "하지만 OpenCV는 원래 C++ 언어로 만들어진 외부 도구이기 때문에, 메모리를 쓰는 구역이 다릅니다.\r\n\r\n" +
+                               "  - **도서관 대출 대장과 외부 창고**:\r\n" +
+                               "    C#의 청소기(GC)는 자기 도서관 책상 위의 얇은 '**대출 대장(C# 객체 변수)**'만 찾아내 치워 줍니다.\r\n" +
+                               "    하지만 실제 거대하고 무거운 '**도서 박스(C++ 원본 픽셀 데이터)**'는 저 멀리 떨어진 **외부 창고(비관리 네이티브 힙)**에 보관됩니다.\r\n" +
+                               "  - **수동 반납 필수**: 외부 창고에 직접 들어간 도서 박스는 C# 청소기가 건드릴 수 없습니다. 따라서 사진을 다 봤다면 개발자가 직접 `Dispose()` 또는 `ReleaseImage()`를 호출해서 '이 책 반납할게요!'라고 명시적으로 창고 박스를 비워 주어야 합니다.\r\n\r\n" +
+                               "--------------------------------------------------\r\n\r\n" +
+                               "■ [메모리 누수(Memory Leak)가 생기는 원리]\r\n" +
+                               "  - C# 변수 `src = new IplImage(...)`로 새 사진을 가져오면 외부 창고에 박스가 하나 생깁니다.\r\n" +
+                               "  - 이 사진을 다 쓴 뒤에 반납 처리를 하지 않고, 그냥 똑같은 변수에 다시 새 이미지(`src = new IplImage(...)`)를 덮어쓰게 되면:\r\n" +
+                               "    1. 변수 `src`는 새로 만든 상자만 가리키게 되며, 이전 상자의 열쇠(참조 포인터)를 잃어버립니다.\r\n" +
+                               "    2. 열쇠가 없어진 이전 도서 박스는 외부 창고 구석에 갇힌 채 영원히 버릴 수도, 찾을 수도 없는 미아 상태가 됩니다.\r\n" +
+                               "    3. 이것이 계속 반복되어 외부 창고에 버려진 박스들이 가득 차 결국 컴퓨터 메모리가 통째로 꽉 차서 뻗어버리는 현상(Out of Memory)을 바로 **메모리 누수(Memory Leak)**라고 합니다.\r\n\r\n" +
+                               "--------------------------------------------------\r\n\r\n" +
+                               "■ [액자 컨트롤(PictureBoxIpl)의 함정]\r\n" +
+                               "  - **PictureBoxIpl**은 단지 외부 창고에 있는 이미지를 액자에 넣어 거실에 보여주는 조수 역할을 합니다.\r\n" +
+                               "  - 액자에 새 사진을 끼워 넣는다고 해서, 액자 조수가 알아서 예전 사진 원본(네이티브 메모리)을 버려주지는 않습니다. 액자 사용이 끝났을 때 원본 이미지를 수동으로 지워 주는 주체는 항상 개발자 자신이어야 합니다.";
+            RichTextHelper.SetMarkdown(txtTheoryText, theoryText);
 
             // Quiz Section Panel
             var pnlQuiz = new Panel
@@ -284,22 +292,24 @@ namespace OpenCVSharp
             }
             tabTheory.Controls.Add(picDiagram);
 
-            var txtDiagramDesc = new TextBox
+            var txtDiagramDesc = new RichTextBox
             {
                 Multiline = true,
                 ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
+                ScrollBars = RichTextBoxScrollBars.Vertical,
                 Location = new Point(590, 535),
                 Size = new Size(580, 150),
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.FromArgb(250, 250, 252),
-                Font = new Font("Malgun Gothic", 9.5F),
-                Text = "【인포그래픽 설명】\r\n" +
-                       "1. 왼쪽(정상 메모리 해제 흐름): C#에서 IplImage 변수를 생성하면 관리 힙에는 작은 래퍼 객체가 생성되고, 실제 대용량 픽셀 데이터는 네이티브 힙에 저장됩니다. 사용 완료 후 `ReleaseImage` 또는 `Dispose()`를 수동으로 명시 호출하면 네이티브 메모리가 즉각 온전히 해제됩니다.\r\n" +
-                       "2. 오른쪽(메모리 누수 발생 흐름): 네이티브 힙에 이미지가 떠 있는 상태에서, 수동 해제 없이 변수에 새 이미지 대입(`new IplImage`)을 반복 수행하면, 이전 래퍼의 포인터만 유실되고 네이티브 힙의 실데이터는 갈 곳을 잃고 그대로 박혀 유실됩니다. C# GC(가비지 컬렉터)는 이 네이티브 힙의 영역을 인지하지 못합니다.\r\n" +
-                       "3. 핵심 요약: 컴퓨터 비전 처리 파이프라인에서 수백 FPS 속도로 대량의 이미지 할당/대입이 반복되므로, 단 몇 프레임의 Dispose() 누락만으로도 초 단위 내에 기가바이트 급의 메모리가 고갈되어 OOM(Out of Memory) 크래시를 맞닥뜨리게 됩니다."
+                Font = new Font("Malgun Gothic", 9.5F)
             };
             tabTheory.Controls.Add(txtDiagramDesc);
+
+            string diagramDesc = "【인포그래픽 설명】\r\n" +
+                                 "1. **왼쪽(정상 메모리 해제 흐름)**: C#에서 IplImage 변수를 생성하면 관리 힙에는 작은 래퍼 객체가 생성되고, 실제 대용량 픽셀 데이터는 네이티브 힙에 저장됩니다. 사용 완료 후 `ReleaseImage` 또는 `Dispose()`를 수동으로 명시 호출하면 네이티브 메모리가 즉각 온전히 해제됩니다.\r\n" +
+                                 "2. **오른쪽(메모리 누수 발생 흐름)**: 네이티브 힙에 이미지가 떠 있는 상태에서, 수동 해제 없이 변수에 새 이미지 대입(`new IplImage`)을 반복 수행하면, 이전 래퍼의 포인터만 유실되고 네이티브 힙의 실데이터는 갈 곳을 잃고 그대로 박혀 유실됩니다. C# GC(가비지 컬렉터)는 이 네이티브 힙의 영역을 인지하지 못합니다.\r\n" +
+                                 "3. **핵심 요약**: 컴퓨터 비전 처리 파이프라인에서 수백 FPS 속도로 대량의 이미지 할당/대입이 반복되므로, 단 몇 프레임의 Dispose() 누락만으로도 초 단위 내에 기가바이트 급의 메모리가 고갈되어 OOM(Out of Memory) 크래시를 맞닥뜨리게 됩니다.";
+            RichTextHelper.SetMarkdown(txtDiagramDesc, diagramDesc);
         }
 
         private void BtnCheckAnswers_Click(object sender, EventArgs e)
@@ -353,7 +363,7 @@ namespace OpenCVSharp
             var panel = new Panel
             {
                 Location = new Point(680, 20),
-                Size = new Size(390, 560),
+                Size = new Size(390, 680), // Increased height for managed memory bar and GC button
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.White
             };
@@ -459,7 +469,7 @@ namespace OpenCVSharp
             // 3. Memory Monitoring Section
             var lblSection3 = new Label
             {
-                Text = "3. 실시간 네이티브 힙 모니터",
+                Text = "3. 실시간 힙 모니터 (Managed vs Native Heap)",
                 Font = new Font("Malgun Gothic", 9.5F, FontStyle.Bold),
                 Location = new Point(15, y),
                 AutoSize = true,
@@ -474,17 +484,17 @@ namespace OpenCVSharp
             lblActiveMemInfo.Size = new Size(350, 15);
             lblActiveMemInfo.Font = new Font("Malgun Gothic", 8.5F, FontStyle.Bold);
             panel.Controls.Add(lblActiveMemInfo);
-            y += 20;
+            y += 18;
 
             pnlActiveBg.Location = new Point(15, y);
-            pnlActiveBg.Size = new Size(360, 12);
+            pnlActiveBg.Size = new Size(360, 10);
             pnlActiveBg.BackColor = Color.FromArgb(40, 40, 40);
             pnlActiveFill.Location = new Point(0, 0);
-            pnlActiveFill.Size = new Size(0, 12);
+            pnlActiveFill.Size = new Size(0, 10);
             pnlActiveFill.BackColor = Color.LimeGreen;
             pnlActiveBg.Controls.Add(pnlActiveFill);
             panel.Controls.Add(pnlActiveBg);
-            y += 20;
+            y += 18;
 
             // Leaked Memory Bar
             lblLeakedMemInfo.Text = "누출(누수) 메모리 합계: 0 Bytes";
@@ -493,16 +503,35 @@ namespace OpenCVSharp
             lblLeakedMemInfo.ForeColor = Color.Crimson;
             lblLeakedMemInfo.Font = new Font("Malgun Gothic", 8.5F, FontStyle.Bold);
             panel.Controls.Add(lblLeakedMemInfo);
-            y += 20;
+            y += 18;
 
             pnlLeakedBg.Location = new Point(15, y);
-            pnlLeakedBg.Size = new Size(360, 12);
+            pnlLeakedBg.Size = new Size(360, 10);
             pnlLeakedBg.BackColor = Color.FromArgb(40, 40, 40);
             pnlLeakedFill.Location = new Point(0, 0);
-            pnlLeakedFill.Size = new Size(0, 12);
+            pnlLeakedFill.Size = new Size(0, 10);
             pnlLeakedFill.BackColor = Color.Crimson;
             pnlLeakedBg.Controls.Add(pnlLeakedFill);
             panel.Controls.Add(pnlLeakedBg);
+            y += 18;
+
+            // Managed Memory Bar
+            lblManagedMemInfo.Text = "C# 관리형 힙 메모리: 0 Bytes";
+            lblManagedMemInfo.Location = new Point(15, y);
+            lblManagedMemInfo.Size = new Size(350, 15);
+            lblManagedMemInfo.ForeColor = Color.RoyalBlue;
+            lblManagedMemInfo.Font = new Font("Malgun Gothic", 8.5F, FontStyle.Bold);
+            panel.Controls.Add(lblManagedMemInfo);
+            y += 18;
+
+            pnlManagedBg.Location = new Point(15, y);
+            pnlManagedBg.Size = new Size(360, 10);
+            pnlManagedBg.BackColor = Color.FromArgb(40, 40, 40);
+            pnlManagedFill.Location = new Point(0, 0);
+            pnlManagedFill.Size = new Size(0, 10);
+            pnlManagedFill.BackColor = Color.RoyalBlue;
+            pnlManagedBg.Controls.Add(pnlManagedFill);
+            panel.Controls.Add(pnlManagedBg);
             y += 20;
 
             // Log / Warning Status
@@ -517,18 +546,27 @@ namespace OpenCVSharp
             panel.Controls.Add(lblWarning);
             y += 37;
 
-            // Reset/Action Buttons
-            btnResetLeaks.Text = "누수 상태 초기화";
+            // Action Buttons (Three layout)
+            btnResetLeaks.Text = "누수 초기화";
             btnResetLeaks.Location = new Point(15, y);
-            btnResetLeaks.Size = new Size(120, 25);
+            btnResetLeaks.Size = new Size(110, 25);
             btnResetLeaks.Click += BtnResetLeaks_Click;
             panel.Controls.Add(btnResetLeaks);
 
             btnFreeNow.Text = "즉시 안전 해제";
-            btnFreeNow.Location = new Point(145, y);
-            btnFreeNow.Size = new Size(120, 25);
+            btnFreeNow.Location = new Point(130, y);
+            btnFreeNow.Size = new Size(110, 25);
             btnFreeNow.Click += BtnFreeNow_Click;
             panel.Controls.Add(btnFreeNow);
+
+            btnRunGC.Text = "⚡ GC.Collect()";
+            btnRunGC.Location = new Point(245, y);
+            btnRunGC.Size = new Size(130, 25);
+            btnRunGC.BackColor = Color.RoyalBlue;
+            btnRunGC.ForeColor = Color.White;
+            btnRunGC.FlatStyle = FlatStyle.Flat;
+            btnRunGC.Click += BtnRunGC_Click;
+            panel.Controls.Add(btnRunGC);
             y += 33;
 
             // 4. Output Options and Info
@@ -585,28 +623,28 @@ namespace OpenCVSharp
             panel.Controls.Add(lblSection5);
             y += 20;
 
-            var txtTheory = new TextBox
+            var txtTheory = new RichTextBox
             {
                 Multiline = true,
                 ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
+                ScrollBars = RichTextBoxScrollBars.Vertical,
                 Location = new Point(15, y),
-                Size = new Size(360, 75),
+                Size = new Size(360, 95),
                 BorderStyle = BorderStyle.Fixed3D,
                 BackColor = Color.WhiteSmoke,
-                Text = "【핵심 이론 및 원리】\r\n" +
-                       "1. 가비지 컬렉션의 한계\r\n" +
-                       "   C# GC는 네이티브 힙(C++ OpenCV)에 생성된 픽셀 데이터를 제때 해제하지 못하므로, 누수가 누적됩니다.\r\n" +
-                       "2. 메모리 누수 재현 실험\r\n" +
-                       "   이전 이미지를 해제(3단계)하지 않고 1단계를 반복 클릭하면, 사용되지 않는 메모리가 네이티브 힙에 방치되어 붉은색 누출 게이지가 올라갑니다.\r\n" +
-                       "3. 안전 해제\r\n" +
-                       "   Cv.ReleaseImage(src)를 호출하면 활성 픽셀 데이터가 즉각 소멸합니다."
+                Font = new Font("Malgun Gothic", 8.5F)
             };
             panel.Controls.Add(txtTheory);
 
+            string theorySummaryText = "【핵심 이론 및 원리】\r\n" +
+                                       "1. **가비지 컬렉션의 한계**: C# GC는 네이티브 힙(C++ OpenCV)에 생성된 픽셀 데이터를 제때 해제하지 못해 메모리가 누적됩니다.\r\n" +
+                                       "2. **누수 재현 실험**: 3단계 해제를 거치지 않고 1단계 로드를 연속 클릭하면, 이전 픽셀 데이터가 네이티브 힙에 갇히게 되어 붉은색 누출 게이지가 올라갑니다.\r\n" +
+                                       "3. **GC 검증**: **GC.Collect()**를 눌러도 래퍼 객체만 청소될 뿐, 네이티브 힙 메모리(붉은색 바)는 전혀 해제되지 않는 구조를 직접 확인하세요.";
+            RichTextHelper.SetMarkdown(txtTheory, theorySummaryText);
+
             tabLab.Controls.Add(new TextBox
             {
-                Text = "실습 가이드: 파일 선택 후 [1단계: 로드] -> [2단계: 출력] 순서대로 실행하세요. 3단계를 생략하고 1단계를 다시 실행하면 '메모리 누수'가 유발되는 현상을 관찰할 수 있습니다.",
+                Text = "실습 가이드: 파일 선택 후 [1단계: 로드] -> [2단계: 출력] 순서대로 실행하세요. 3단계를 생략하고 1단계를 반복 로드하여 '메모리 누수'가 유발되는 현상과 GC 실행 시 변화 유무를 대조하십시오.",
                 Location = new Point(20, 520),
                 Size = new Size(640, 45),
                 Multiline = true,
@@ -615,6 +653,8 @@ namespace OpenCVSharp
                 BackColor = Color.LightYellow,
                 Font = new Font("Malgun Gothic", 9.5F)
             });
+
+            UpdateMemoryGauges();
         }
 
         private void SetupCodeTextBox(TextBox txt, string code, Point loc)
@@ -648,8 +688,7 @@ namespace OpenCVSharp
             string defaultPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Italia.jpg");
             if (!File.Exists(defaultPath))
             {
-                // Fallback to project root if run from bin/Debug during development
-                defaultPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\Italia.jpg");
+                defaultPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\" + ItaliaPathWorkaround());
             }
 
             if (File.Exists(defaultPath))
@@ -660,6 +699,11 @@ namespace OpenCVSharp
             {
                 MessageBox.Show("기본 이미지 'Italia.jpg'를 찾을 수 없습니다.\n프로젝트 폴더 또는 실행 파일 위치에 저장해 주세요.", "파일 없음", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
+        }
+
+        private string ItaliaPathWorkaround()
+        {
+            return "Italia.jpg";
         }
 
         private void SelectFile(string filepath)
@@ -675,7 +719,6 @@ namespace OpenCVSharp
             btnStep3.Enabled = false;
         }
 
-        // [Step 1] Load Image to Native Memory
         private void BtnStep1_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrEmpty(selectedFilePath) || !File.Exists(selectedFilePath))
@@ -686,8 +729,6 @@ namespace OpenCVSharp
 
             try
             {
-                // Check for MEMORY LEAK!
-                // If src is already loaded and we overwrite it without Cv.ReleaseImage, it's a leak.
                 if (src != null)
                 {
                     long leakSize = src.Width * src.Height * src.NChannels;
@@ -704,7 +745,6 @@ namespace OpenCVSharp
                     lblWarning.ForeColor = Color.DarkBlue;
                 }
 
-                // Handle non-ASCII path (OpenCV 2.4 limit)
                 string pathToOpen = selectedFilePath;
                 foreach (char c in selectedFilePath)
                 {
@@ -720,7 +760,6 @@ namespace OpenCVSharp
                 }
                 pathToOpen = pathToOpen.Replace('\\', '/');
 
-                // Load image using legacy IplImage
                 src = new IplImage(pathToOpen, LoadMode.Color);
                 if (src == null)
                 {
@@ -730,11 +769,9 @@ namespace OpenCVSharp
 
                 currentAllocatedBytes = src.Width * src.Height * src.NChannels;
 
-                // Update Info Labels
                 lblResolution.Text = $"해상도: {src.Width} x {src.Height}";
                 lblChannels.Text = $"채널 수: {src.NChannels} (BGR)";
 
-                // Enable subsequent steps
                 btnStep2.Enabled = true;
                 btnStep3.Enabled = true;
 
@@ -746,7 +783,6 @@ namespace OpenCVSharp
             }
         }
 
-        // [Step 2] Bind Image to PictureBox
         private void BtnStep2_Click(object sender, EventArgs e)
         {
             if (src == null)
@@ -762,7 +798,6 @@ namespace OpenCVSharp
             lblWarning.ForeColor = Color.DarkGreen;
         }
 
-        // [Step 3] Release Image Memory
         private void BtnStep3_Click(object sender, EventArgs e)
         {
             if (src == null) return;
@@ -811,17 +846,38 @@ namespace OpenCVSharp
             }
         }
 
+        private void BtnRunGC_Click(object sender, EventArgs e)
+        {
+            // Force Garbage Collection to prove it doesn't collect native memory
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            lblWarning.Text = "상태: C# GC.Collect() 강제 구동 완료. (관리형 메모리만 소량 정리됨)";
+            lblWarning.BackColor = Color.LightGreen;
+            lblWarning.ForeColor = Color.DarkGreen;
+
+            UpdateMemoryGauges();
+        }
+
         private void UpdateMemoryGauges()
         {
+            long managedMemory = GC.GetTotalMemory(false);
+
             lblActiveMemInfo.Text = $"활성 네이티브 메모리: {currentAllocatedBytes:N0} Bytes ({currentAllocatedBytes / 1024.0 / 1024.0:F2} MB)";
             lblLeakedMemInfo.Text = $"누출(누수) 메모리 합계: {totalLeakedBytes:N0} Bytes ({totalLeakedBytes / 1024.0 / 1024.0:F2} MB)";
+            lblManagedMemInfo.Text = $"C# 관리형 힙 메모리: {managedMemory:N0} Bytes ({managedMemory / 1024.0 / 1024.0:F2} MB)";
 
-            // Calculate fill bar widths
+            // Calculate fill bar widths (normalized)
             int activeWidth = (int)Math.Min(360, (currentAllocatedBytes * 360) / MaxBytes);
             int leakedWidth = (int)Math.Min(360, (totalLeakedBytes * 360) / MaxBytes);
 
+            long maxManagedBytes = 20 * 1024 * 1024; // 20 MB max scale for managed bar
+            int managedWidth = (int)Math.Min(360, (managedMemory * 360) / maxManagedBytes);
+
             pnlActiveFill.Width = activeWidth;
             pnlLeakedFill.Width = leakedWidth;
+            pnlManagedFill.Width = managedWidth;
         }
 
         private void ReleaseCurrentImage()

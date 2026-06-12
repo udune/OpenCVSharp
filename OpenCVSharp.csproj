@@ -83,7 +83,12 @@
     <Compile Include="FormCh05.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="FormCh06.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="OpenCV_CLASS.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="RichTextHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
@@ -117,6 +122,8 @@
     <Content Include="ref\003 Camera 출력.png" />
     <Content Include="ref\004 동영상 파일 출력.png" />
     <Content Include="ref\005 이미지 파일 출력.png" />
+    <Content Include="ref\006 클래스 생성 &amp; GrayScale.png" />
+    <Content Include="ch06_class_grayscale_ko.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -3,6 +3,12 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
+using OpenCvSharp;
+using OpenCvSharp.Extensions;
+
+using Point = System.Drawing.Point;
+using Size = System.Drawing.Size;
+using FontStyle = System.Drawing.FontStyle;
 
 namespace OpenCVSharp
 {
@@ -33,6 +39,7 @@ namespace OpenCVSharp
         private readonly ComboBox cmbChannels = new ComboBox();
         private readonly NumericUpDown nudInterval = new NumericUpDown();
         private readonly ComboBox cmbSizeMode = new ComboBox();
+        private readonly ComboBox cmbEngine = new ComboBox(); // GDI+ vs OpenCV
 
         private readonly Label lblMemoryCalc = new Label();
         private readonly Label lblTargetFps = new Label();
@@ -40,6 +47,11 @@ namespace OpenCVSharp
 
         private readonly Button btnStart = new Button();
         private readonly Button btnStop = new Button();
+
+        // Pixel Magnifier Controls
+        private readonly GroupBox grpMagnifier = new GroupBox();
+        private readonly PictureBox pbMagnifier = new PictureBox();
+        private readonly Label lblMagnifierInfo = new Label();
 
         private readonly Timer renderTimer = new Timer();
         private readonly Stopwatch fpsWatch = new Stopwatch();
@@ -50,6 +62,8 @@ namespace OpenCVSharp
         private float ballSpeedX = 6f;
         private float ballSpeedY = 4f;
         private const int BallRadius = 20;
+
+        private Point lastMousePos = new Point(360, 240); // default to center of 720x480 pictureBox
 
         public FormCh02()
         {
@@ -91,41 +105,43 @@ namespace OpenCVSharp
             tabTheory.Controls.Add(lblTitle);
 
             // Theory Text Box
-            var txtTheoryText = new TextBox
+            var txtTheoryText = new RichTextBox
             {
                 Multiline = true,
                 ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
+                ScrollBars = RichTextBoxScrollBars.Vertical,
                 Location = new Point(20, 60),
                 Size = new Size(550, 280),
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.FromArgb(252, 252, 248),
-                Font = new Font("Malgun Gothic", 10F),
-                Text = "■ [이미지 크기와 용량 (Memory Size)]\r\n" +
-                       "디지털 이미지는 픽셀(Pixel)이라고 부르는 작은 '색상 점'들이 가로, 세로 격자 판 위에 가득 모여서 이루어집니다.\r\n" +
-                       "이미지가 차지하는 메모리 용량은 가로 점 개수, 세로 점 개수, 그리고 색상 표현 방식(채널)을 곱해서 계산합니다.\r\n\r\n" +
-                       "★ 계산 공식: 이미지 용량(바이트) = 가로 크기 × 세로 크기 × 채널 수\r\n" +
-                       "  - 명암/흑백 (Grayscale): 1채널. 각 점이 검은색~흰색 밝기만 표현하므로 점당 1바이트만 사용합니다.\r\n" +
-                       "  - 컬러 (BGR): 3채널. 빛의 삼원색인 파랑(B), 초록(G), 빨강(R) 3가지 색상을 섞어 표시하므로 점당 3바이트(3채널)를 사용합니다.\r\n" +
-                       "  - 컬러 이미지는 흑백 이미지보다 정보량이 정확히 3배 더 무겁습니다!\r\n\r\n" +
-                       "--------------------------------------------------\r\n\r\n" +
-                       "■ [FPS와 프레임 대기 시간 (Interval)]\r\n" +
-                       "동영상은 낱장 카드 그림책을 빠르게 스르륵 넘기듯, 정지 사진 여러 장을 순서대로 빠르게 보여주는 것입니다.\r\n" +
-                       "  - FPS (Frames Per Second): 1초 동안 화면에 스쳐 지나가는 사진(프레임)의 장수입니다.\r\n" +
-                       "  - 프레임 대기 시간 (Interval): 사진 한 장을 띄우고 다음 사진으로 넘어가기 전까지 멈춰 있는 대기 시간(ms, 1000분의 1초)입니다.\r\n\r\n" +
-                       "★ 관계 공식: 목표 FPS = 1000 / 대기 시간(ms)\r\n" +
-                       "  - 33ms 주기인 경우: 1000 / 33 ≒ 30.3 FPS (TV나 유튜브 표준으로 부드럽게 보임)\r\n" +
-                       "  - 16ms 주기인 경우: 1000 / 16 ≒ 62.5 FPS (게임 등에서 고주사율로 매끄럽게 보임)\r\n\r\n" +
-                       "※ 실제 성능 오차: 컴퓨터의 연산 속도 한계나 윈도우 창을 그리는 부하 때문에 실제 측정되는 FPS는 공식 이론값보다 더 떨어질 수 있습니다.\r\n\r\n" +
-                       "--------------------------------------------------\r\n\r\n" +
-                       "■ [화면 크기 조절 모드 (PictureBoxSizeMode)]\r\n" +
-                       "내가 불러온 사진 크기(해상도)와 화면의 액자 크기가 맞지 않을 때 채우는 네 가지 방법입니다.\r\n" +
-                       "  - Normal: 사진의 원본 크기 그대로 액자 왼쪽 꼭대기부터 띄웁니다. 액자보다 큰 부분은 잘려 나갑니다.\r\n" +
-                       "  - StretchImage: 사진 비율이 찌그러지더라도 액자 크기에 맞게 억지로 늘려 꽉 채웁니다.\r\n" +
-                       "  - Zoom: 사진 가로/세로 비율을 예쁘게 유지하면서 액자 안에 가득 들어가도록 늘리거나 줄입니다. 비율이 안 맞으면 빈 여백(검은 띠)이 생깁니다.\r\n" +
-                       "  - CenterImage: 사진을 찌그러뜨리지 않고 정중앙을 기준으로 액자에 정렬해 표시합니다."
+                Font = new Font("Malgun Gothic", 10F)
             };
             tabTheory.Controls.Add(txtTheoryText);
+
+            string theoryText = "■ [이미지 크기와 용량 (Memory Size)]\r\n" +
+                               "디지털 이미지는 **픽셀(Pixel)**이라고 부르는 작은 '색상 점'들이 가로, 세로 격자 판 위에 가득 모여서 이루어집니다.\r\n" +
+                               "이미지가 차지하는 메모리 용량은 가로 점 개수, 세로 점 개수, 그리고 색상 표현 방식(채널)을 곱해서 계산합니다.\r\n\r\n" +
+                               "★ 계산 공식: 이미지 용량(바이트) = 가로 크기 × 세로 크기 × 채널 수\r\n" +
+                               "  - **명암/흑백 (Grayscale)**: **1채널**. 각 점이 검은색~흰색 밝기만 표현하므로 점당 **1바이트**만 사용합니다.\r\n" +
+                               "  - **컬러 (BGR)**: **3채널**. 빛의 삼원색인 파랑(B), 초록(G), 빨강(R) 3가지 색상을 섞어 표시하므로 점당 **3바이트**(3채널)를 사용합니다.\r\n" +
+                               "  - 컬러 이미지는 흑백 이미지보다 정보량이 정확히 **3배** 더 무겁습니다!\r\n\r\n" +
+                               "--------------------------------------------------\r\n\r\n" +
+                               "■ [FPS와 프레임 대기 시간 (Interval)]\r\n" +
+                               "동영상은 낱장 카드 그림책을 빠르게 스르륵 넘기듯, 정지 사진 여러 장을 순서대로 빠르게 보여주는 것입니다.\r\n" +
+                               "  - **FPS (Frames Per Second)**: 1초 동안 화면에 스쳐 지나가는 사진(프레임)의 장수입니다.\r\n" +
+                               "  - **프레임 대기 시간 (Interval)**: 사진 한 장을 띄우고 다음 사진으로 넘어가기 전까지 멈춰 있는 대기 시간(ms, 1000분의 1초)입니다.\r\n\r\n" +
+                               "★ 관계 공식: 목표 FPS = 1000 / 대기 시간(ms)\r\n" +
+                               "  - **33ms** 주기인 경우: 1000 / 33 ≒ **30.3 FPS** (TV나 유튜브 표준으로 부드럽게 보임)\r\n" +
+                               "  - **16ms** 주기인 경우: 1000 / 16 ≒ **62.5 FPS** (게임 등에서 고주사율로 매끄럽게 보임)\r\n\r\n" +
+                               "※ **실제 성능 오차**: 컴퓨터의 연산 속도 한계나 윈도우 창을 그리는 부하, 그리고 GDI+ vs OpenCV 렌더링 방식의 연산 차이 때문에 실제 측정되는 FPS는 공식 이론값보다 더 떨어질 수 있습니다.\r\n\r\n" +
+                               "--------------------------------------------------\r\n\r\n" +
+                               "■ [화면 크기 조절 모드 (PictureBoxSizeMode)]\r\n" +
+                               "내가 불러온 사진 크기(해상도)와 화면의 액자 크기가 맞지 않을 때 채우는 네 가지 방법입니다.\r\n" +
+                               "  - **Normal**: 사진의 원본 크기 그대로 액자 왼쪽 꼭대기부터 띄웁니다. 액자보다 큰 부분은 잘려 나갑니다.\r\n" +
+                               "  - **StretchImage**: 사진 비율이 찌그러지더라도 액자 크기에 맞게 억지로 늘려 꽉 채웁니다.\r\n" +
+                               "  - **Zoom**: 사진 가로/세로 비율을 예쁘게 유지하면서 액자 안에 가득 들어가도록 늘리거나 줄입니다. 비율이 안 맞으면 빈 여백(검은 띠)이 생깁니다.\r\n" +
+                               "  - **CenterImage**: 사진을 찌그러뜨리지 않고 정중앙을 기준으로 액자에 정렬해 표시합니다.";
+            RichTextHelper.SetMarkdown(txtTheoryText, theoryText);
 
             // Quiz Section Panel
             var pnlQuiz = new Panel
@@ -270,22 +286,24 @@ namespace OpenCVSharp
             }
             tabTheory.Controls.Add(picDiagram);
 
-            var txtDiagramDesc = new TextBox
+            var txtDiagramDesc = new RichTextBox
             {
                 Multiline = true,
                 ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
+                ScrollBars = RichTextBoxScrollBars.Vertical,
                 Location = new Point(590, 535),
                 Size = new Size(580, 150),
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.FromArgb(250, 250, 252),
-                Font = new Font("Malgun Gothic", 9.5F),
-                Text = "【인포그래픽 설명】\r\n" +
-                       "1. 왼쪽(단일 채널 - 그레이스케일): 픽셀 하나당 1바이트(8비트, 0~255) 데이터만을 사용합니다. 명암 강도만을 표현하므로 메모리를 최소한으로 소모합니다.\r\n" +
-                       "2. 오른쪽(3채널 - BGR 컬러): 픽셀 하나를 구성하기 위해 Blue(청색), Green(녹색), Red(적색) 각각 1바이트씩 총 3바이트(24비트)의 메모리를 소모합니다. 픽셀 당 3개 성분의 조합을 통해 다채로운 색을 구현합니다.\r\n" +
-                       "3. 결론: 컬러 이미지는 동일 해상도의 흑백 이미지보다 데이터양이 정확히 3배가 되어 하드웨어 대역폭과 계산 성능에 상당한 부담을 줍니다. 따라서 고속 처리가 생명인 컴퓨터 비전 파이프라인에서는 컬러 이미지를 그레이스케일로 변환하는 작업을 전처리 1순위로 수행합니다."
+                Font = new Font("Malgun Gothic", 9.5F)
             };
             tabTheory.Controls.Add(txtDiagramDesc);
+
+            string diagramDesc = "【인포그래픽 설명】\r\n" +
+                                 "1. **왼쪽(단일 채널 - 그레이스케일)**: 픽셀 하나당 **1바이트**(8비트, 0~255) 데이터만을 사용합니다. 명암 강도만을 표현하므로 메모리를 최소한으로 소모합니다.\r\n" +
+                                 "2. **오른쪽(3채널 - BGR 컬러)**: 픽셀 하나를 구성하기 위해 **Blue(청색), Green(녹색), Red(적색)** 각각 1바이트씩 총 **3바이트**(24비트)의 메모리를 소모합니다. 픽셀 당 3개 성분의 조합을 통해 다채로운 색을 구현합니다.\r\n" +
+                                 "3. **결론**: 컬러 이미지는 동일 해상도의 흑백 이미지보다 데이터양이 정확히 **3배**가 되어 하드웨어 대역폭과 계산 성능에 상당한 부담을 줍니다. 따라서 고속 처리가 생명인 컴퓨터 비전 파이프라인에서는 컬러 이미지를 그레이스케일로 변환하는 작업을 전처리 1순위로 수행합니다.";
+            RichTextHelper.SetMarkdown(txtDiagramDesc, diagramDesc);
         }
 
         private void BtnCheckAnswers_Click(object sender, EventArgs e)
@@ -316,7 +334,7 @@ namespace OpenCVSharp
             else if (rdoQ2O.Checked)
             {
                 lblQ2Result.ForeColor = Color.Red;
-                lblQ2Result.Text = "오답입니다. StretchImage는 비율을 유지하지 않고 화면 전체에 찌그러트립니다.";
+                lblQ2Result.Text = "오답입니다. StretchImage는 비율을 유지하지 않고 화면 전체에 찌러트립니다.";
             }
             else
             {
@@ -332,6 +350,7 @@ namespace OpenCVSharp
             pictureBox.SizeMode = PictureBoxSizeMode.Zoom;
             pictureBox.BorderStyle = BorderStyle.FixedSingle;
             pictureBox.BackColor = Color.Black;
+            pictureBox.MouseMove += PictureBox_MouseMove;
             tabLab.Controls.Add(pictureBox);
 
             var panel = new Panel
@@ -400,6 +419,15 @@ namespace OpenCVSharp
             cmbSizeMode.SelectedIndex = 2;
             cmbSizeMode.SelectedIndexChanged += (s, e) => pictureBox.SizeMode = sizeModes[cmbSizeMode.SelectedIndex];
             panel.Controls.Add(cmbSizeMode);
+            y += 35;
+
+            addHeader("5. 렌더링 엔진 선택 (Engine)");
+            cmbEngine.Location = new Point(15, y);
+            cmbEngine.Size = new Size(270, 25);
+            cmbEngine.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbEngine.Items.AddRange(new object[] { "WinForms GDI+ (Graphics)", "OpenCVSharp (IplImage -> Bitmap)" });
+            cmbEngine.SelectedIndex = 0;
+            panel.Controls.Add(cmbEngine);
             y += 45;
 
             addHeader("■ 실시간 계산 결과");
@@ -437,39 +465,186 @@ namespace OpenCVSharp
             panel.Controls.Add(btnStop);
             y += 45;
 
-            panel.Controls.Add(new TextBox
+            var txtTheory = new RichTextBox
             {
                 Multiline = true,
                 ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
+                ScrollBars = RichTextBoxScrollBars.Vertical,
                 Location = new Point(15, y),
                 Size = new Size(275, 120),
                 BorderStyle = BorderStyle.Fixed3D,
                 BackColor = Color.WhiteSmoke,
-                Text = "【핵심 이론 및 원리】\r\n" +
-                       "1. 이미지 크기 (Memory Size)\r\n" +
-                       "   공식: 가로 × 세로 × 채널 수 (Bytes)\r\n" +
-                       "   - 그레이스케일: 1채널 (명암값)\r\n" +
-                       "   - 컬러(BGR): 3채널 (Blue, Green, Red)\r\n\r\n" +
-                       "2. FPS 와 Interval 관계\r\n" +
-                       "   공식: Target FPS = 1000 / Interval(ms)\r\n" +
-                       "   - 33ms ≒ 30.3 FPS (표준 비디오)\r\n" +
-                       "   - 16ms ≒ 62.5 FPS\r\n\r\n" +
-                       "3. 렌더링 오차\r\n" +
-                       "   - PC 성능, 화면 크기 조절, UI 타이머 오차로 인해 실제 측정 FPS는 계산값보다 작을 수 있습니다."
-            });
+                Font = new Font("Malgun Gothic", 8.5F)
+            };
+            panel.Controls.Add(txtTheory);
+
+            string theorySummaryText = "【핵심 이론 및 원리】\r\n" +
+                                       "1. **이미지 크기 (Memory Size)**\r\n" +
+                                       "   - 공식: **가로 × 세로 × 채널 수** (Bytes)\r\n" +
+                                       "   - 그레이스케일: 1채널 (명암값)\r\n" +
+                                       "   - 컬러(BGR): 3채널 (Blue, Green, Red)\r\n" +
+                                       "2. **FPS 와 Interval 관계**\r\n" +
+                                       "   - 공식: **Target FPS = 1000 / Interval(ms)**\r\n" +
+                                       "   - 33ms ≒ 30.3 FPS (표준 비디오)\r\n" +
+                                       "3. **렌더링 오차**\r\n" +
+                                       "   - PC 성능, 화면 크기 조절, UI 타이머 오차, 마샬링 오버헤드로 실제 측정 FPS는 계산값보다 작습니다.";
+            RichTextHelper.SetMarkdown(txtTheory, theorySummaryText);
 
             tabLab.Controls.Add(new TextBox
             {
                 Text = "실습 가이드: 각 옵션을 설정한 뒤 [시작] 버튼을 눌러 공의 움직임과 FPS 변동을 관찰해 보세요.",
-                Location = new Point(20, 520),
-                Size = new Size(720, 45),
-                Multiline = true,
+                Location = new Point(20, 680),
+                Size = new Size(720, 25),
                 ReadOnly = true,
-                BorderStyle = BorderStyle.FixedSingle,
-                BackColor = Color.LightYellow,
-                Font = new Font("Malgun Gothic", 9.5F)
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(240, 244, 248),
+                Font = new Font("Malgun Gothic", 9.5F, FontStyle.Bold)
             });
+
+            // Initialize Pixel Magnifier UI
+            InitializeMagnifierUI();
+        }
+
+        private void InitializeMagnifierUI()
+        {
+            grpMagnifier.Text = "🔍 실시간 픽셀 구조 돋보기 (마우스 오버 연동)";
+            grpMagnifier.Location = new Point(20, 505);
+            grpMagnifier.Size = new Size(720, 165);
+            grpMagnifier.Font = new Font("Malgun Gothic", 9F, FontStyle.Bold);
+            tabLab.Controls.Add(grpMagnifier);
+
+            pbMagnifier.Location = new Point(15, 22);
+            pbMagnifier.Size = new Size(200, 200); // 5x5 grid, each 40px
+            pbMagnifier.Size = new Size(130, 130); // 5x5 grid, each 26px
+            pbMagnifier.BorderStyle = BorderStyle.FixedSingle;
+            pbMagnifier.BackColor = Color.DarkGray;
+            pbMagnifier.Paint += PbMagnifier_Paint;
+            grpMagnifier.Controls.Add(pbMagnifier);
+
+            lblMagnifierInfo.Location = new Point(160, 22);
+            lblMagnifierInfo.Size = new Size(540, 130);
+            lblMagnifierInfo.Font = new Font("Malgun Gothic", 9F, FontStyle.Regular);
+            
+            var rtbMagnifierInfo = new RichTextBox
+            {
+                Location = new Point(160, 22),
+                Size = new Size(545, 130),
+                ReadOnly = true,
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(240, 244, 248),
+                Font = new Font("Malgun Gothic", 9F)
+            };
+            grpMagnifier.Controls.Add(rtbMagnifierInfo);
+
+            string magnifierText = "★ **실시간 픽셀 구조 확대경** 설명\r\n" +
+                                   "1. 왼쪽 격자판은 큰 화면 상에 올라간 이미지의 **마우스 커서 위치 주변 5x5 픽셀**을 확대한 화면입니다.\r\n" +
+                                   "2. 각 격자칸 내부의 숫자는 메모리 상에 기록된 실제 원시(Raw) 바이트 값입니다.\r\n" +
+                                   "   - **Grayscale (1Ch)**: 단일 밝기 강도 값 (**0~255**)을 나타냅니다.\r\n" +
+                                   "   - **BGR Color (3Ch)**: 파란색(B), 녹색(G), 빨간색(R) 각 채널 값들을 나타냅니다.\r\n" +
+                                   "3. 해상도 및 채널 선택 상태에 따라 픽셀 행렬 구조와 데이터 스케일이 달라지는 모습을 실시간으로 관찰할 수 있습니다.";
+            RichTextHelper.SetMarkdown(rtbMagnifierInfo, magnifierText);
+        }
+
+        private void PictureBox_MouseMove(object sender, MouseEventArgs e)
+        {
+            lastMousePos = e.Location;
+            pbMagnifier.Invalidate();
+        }
+
+        private Point MapMouseToBitmap(Point clientPt, PictureBox pb, int bmpW, int bmpH)
+        {
+            if (pb.SizeMode == PictureBoxSizeMode.StretchImage)
+            {
+                int x = (int)((double)clientPt.X / pb.Width * bmpW);
+                int y = (int)((double)clientPt.Y / pb.Height * bmpH);
+                return new Point(Math.Max(0, Math.Min(bmpW - 1, x)), Math.Max(0, Math.Min(bmpH - 1, y)));
+            }
+            else if (pb.SizeMode == PictureBoxSizeMode.Zoom)
+            {
+                double ratioX = (double)pb.Width / bmpW;
+                double ratioY = (double)pb.Height / bmpH;
+                double ratio = Math.Min(ratioX, ratioY);
+
+                int viewW = (int)(bmpW * ratio);
+                int viewH = (int)(bmpH * ratio);
+
+                int viewX = (pb.Width - viewW) / 2;
+                int viewY = (pb.Height - viewH) / 2;
+
+                int x = (int)((clientPt.X - viewX) / ratio);
+                int y = (int)((clientPt.Y - viewY) / ratio);
+
+                return new Point(Math.Max(0, Math.Min(bmpW - 1, x)), Math.Max(0, Math.Min(bmpH - 1, y)));
+            }
+            else
+            {
+                return new Point(Math.Max(0, Math.Min(bmpW - 1, clientPt.X)), Math.Max(0, Math.Min(bmpH - 1, clientPt.Y)));
+            }
+        }
+
+        private void PbMagnifier_Paint(object sender, PaintEventArgs e)
+        {
+            if (pictureBox.Image == null) return;
+            var bmp = pictureBox.Image as Bitmap;
+            if (bmp == null) return;
+
+            GetResolution(out int w, out int h);
+            Point mapped = MapMouseToBitmap(lastMousePos, pictureBox, w, h);
+
+            int gridSize = 5;
+            int cellSize = 26; // 130 / 5 = 26
+            int startX = mapped.X - gridSize / 2;
+            int startY = mapped.Y - gridSize / 2;
+
+            for (int r = 0; r < gridSize; r++)
+            {
+                for (int c = 0; c < gridSize; c++)
+                {
+                    int px = startX + c;
+                    int py = startY + r;
+
+                    Color col = Color.FromArgb(40, 40, 40);
+                    bool inBounds = (px >= 0 && px < bmp.Width && py >= 0 && py < bmp.Height);
+                    if (inBounds)
+                    {
+                        col = bmp.GetPixel(px, py);
+                    }
+
+                    // Draw cell background
+                    using (var brush = new SolidBrush(col))
+                    {
+                        e.Graphics.FillRectangle(brush, c * cellSize, r * cellSize, cellSize, cellSize);
+                    }
+
+                    // Draw cell border
+                    e.Graphics.DrawRectangle(Pens.Gray, c * cellSize, r * cellSize, cellSize, cellSize);
+
+                    // Draw cell text value
+                    if (inBounds)
+                    {
+                        double brightness = (col.R * 0.299 + col.G * 0.587 + col.B * 0.114);
+                        Brush textBrush = brightness > 128 ? Brushes.Black : Brushes.White;
+
+                        using (var f = new Font("Consolas", 5.5F))
+                        {
+                            string txt;
+                            if (GetChannels() == 1)
+                            {
+                                txt = col.R.ToString();
+                            }
+                            else
+                            {
+                                txt = $"{col.B}\n{col.G}\n{col.R}";
+                            }
+
+                            var size = e.Graphics.MeasureString(txt, f);
+                            float tx = c * cellSize + (cellSize - size.Width) / 2;
+                            float ty = r * cellSize + (cellSize - size.Height) / 2;
+                            e.Graphics.DrawString(txt, f, textBrush, tx, ty);
+                        }
+                    }
+                }
+            }
         }
 
         private void GetResolution(out int w, out int h)
@@ -506,6 +681,7 @@ namespace OpenCVSharp
             btnStop.Enabled = true;
             cmbResolution.Enabled = false;
             cmbChannels.Enabled = false;
+            cmbEngine.Enabled = false;
         }
 
         private void BtnStop_Click(object sender, EventArgs e) => StopTimer();
@@ -517,6 +693,7 @@ namespace OpenCVSharp
             btnStop.Enabled = false;
             cmbResolution.Enabled = true;
             cmbChannels.Enabled = true;
+            cmbEngine.Enabled = true;
             lblMeasuredFps.Text = "실제 측정 FPS: 0 (정지됨)";
         }
 
@@ -524,42 +701,88 @@ namespace OpenCVSharp
         {
             GetResolution(out int w, out int h);
             int ch = GetChannels();
+            Bitmap bitmap = null;
 
-            var bitmap = new Bitmap(w, h);
-            using (var g = Graphics.FromImage(bitmap))
+            if (cmbEngine.SelectedIndex == 0)
             {
-                g.Clear(ch == 1 ? Color.FromArgb(40, 40, 40) : Color.FromArgb(20, 30, 40));
-
-                ballX += ballSpeedX * (w / 640f);
-                ballY += ballSpeedY * (h / 480f);
-                float r = Math.Max(10f, BallRadius * (w / 640f));
-
-                if (ballX - r < 0) { ballX = r; ballSpeedX = -ballSpeedX; }
-                else if (ballX + r > w) { ballX = w - r; ballSpeedX = -ballSpeedX; }
-
-                if (ballY - r < 0) { ballY = r; ballSpeedY = -ballSpeedY; }
-                else if (ballY + r > h) { ballY = h - r; ballSpeedY = -ballSpeedY; }
-
-                g.FillEllipse(ch == 1 ? Brushes.LightGray : Brushes.OrangeRed, ballX - r, ballY - r, r * 2, r * 2);
-
-                using (var gridPen = new Pen(Color.FromArgb(50, 255, 255, 255), 1))
+                // 1. WinForms GDI+ (Graphics) Drawing Path
+                bitmap = new Bitmap(w, h);
+                using (var g = Graphics.FromImage(bitmap))
                 {
-                    g.DrawLine(gridPen, w / 2, 0, w / 2, h);
-                    g.DrawLine(gridPen, 0, h / 2, w, h / 2);
+                    g.Clear(ch == 1 ? Color.FromArgb(40, 40, 40) : Color.FromArgb(20, 30, 40));
+
+                    ballX += ballSpeedX * (w / 640f);
+                    ballY += ballSpeedY * (h / 480f);
+                    float r = Math.Max(10f, BallRadius * (w / 640f));
+
+                    if (ballX - r < 0) { ballX = r; ballSpeedX = -ballSpeedX; }
+                    else if (ballX + r > w) { ballX = w - r; ballSpeedX = -ballSpeedX; }
+
+                    if (ballY - r < 0) { ballY = r; ballSpeedY = -ballSpeedY; }
+                    else if (ballY + r > h) { ballY = h - r; ballSpeedY = -ballSpeedY; }
+
+                    g.FillEllipse(ch == 1 ? Brushes.LightGray : Brushes.OrangeRed, ballX - r, ballY - r, r * 2, r * 2);
+
+                    using (var gridPen = new Pen(Color.FromArgb(50, 255, 255, 255), 1))
+                    {
+                        g.DrawLine(gridPen, w / 2, 0, w / 2, h);
+                        g.DrawLine(gridPen, 0, h / 2, w, h / 2);
+                    }
+
+                    float fontSize = Math.Max(10f, w / 40f);
+                    using (var font = new Font("Malgun Gothic", fontSize, FontStyle.Bold))
+                    {
+                        g.DrawString($"Simulated GDI+ Frame: {w} x {h} ({ch}Ch)", font, Brushes.White, 20, 20);
+                        g.DrawString(DateTime.Now.ToString("HH:mm:ss.fff"), font, Brushes.White, 20, 20 + fontSize * 1.5f);
+                        g.DrawString($"Memory: {w * h * ch / 1024.0 / 1024.0:F2} MB", font, Brushes.White, 20, 20 + fontSize * 3.0f);
+                    }
                 }
-
-                float fontSize = Math.Max(10f, w / 40f);
-                using (var font = new Font("Malgun Gothic", fontSize, FontStyle.Bold))
+            }
+            else
+            {
+                // 2. OpenCVSharp (IplImage -> Bitmap) Drawing Path
+                using (var ipl = new IplImage(w, h, BitDepth.U8, ch))
                 {
-                    g.DrawString($"Simulated Frame: {w} x {h} ({ch}Ch)", font, Brushes.White, 20, 20);
-                    g.DrawString(DateTime.Now.ToString("HH:mm:ss.fff"), font, Brushes.White, 20, 20 + fontSize * 1.5f);
-                    g.DrawString($"Memory: {w * h * ch / 1024.0 / 1024.0:F2} MB", font, Brushes.White, 20, 20 + fontSize * 3.0f);
+                    // Clear background
+                    CvColor bgCol = ch == 1 ? new CvColor(40) : new CvColor(40, 30, 20); // BGR order (B=40, G=30, R=20)
+                    ipl.Set(bgCol);
+
+                    ballX += ballSpeedX * (w / 640f);
+                    ballY += ballSpeedY * (h / 480f);
+                    float r = Math.Max(10f, BallRadius * (w / 640f));
+
+                    if (ballX - r < 0) { ballX = r; ballSpeedX = -ballSpeedX; }
+                    else if (ballX + r > w) { ballX = w - r; ballSpeedX = -ballSpeedX; }
+
+                    if (ballY - r < 0) { ballY = r; ballSpeedY = -ballSpeedY; }
+                    else if (ballY + r > h) { ballY = h - r; ballSpeedY = -ballSpeedY; }
+
+                    // Draw grid using OpenCV
+                    CvColor gridCol = new CvColor(50, 50, 50);
+                    ipl.Line(new CvPoint(w / 2, 0), new CvPoint(w / 2, h), gridCol, 1);
+                    ipl.Line(new CvPoint(0, h / 2), new CvPoint(w, h / 2), gridCol, 1);
+
+                    // Draw ellipse (circle) using OpenCV
+                    CvColor ballCol = ch == 1 ? new CvColor(200) : new CvColor(0, 69, 255); // BGR order (B=0, G=69, R=255 for OrangeRed)
+                    ipl.Circle(new CvPoint((int)ballX, (int)ballY), (int)r, ballCol, -1);
+
+                    // Draw strings using OpenCV Hershey fonts
+                    double textScale = 0.35 * (w / 320.0);
+                    var font = new CvFont(FontFace.HersheySimplex, textScale, textScale, 0, 1);
+                    ipl.PutText($"Simulated OpenCV Frame: {w} x {h} ({ch}Ch)", new CvPoint(20, (int)(30 * (w / 640.0) + 15)), font, CvColor.White);
+                    ipl.PutText(DateTime.Now.ToString("HH:mm:ss.fff"), new CvPoint(20, (int)(60 * (w / 640.0) + 25)), font, CvColor.White);
+                    ipl.PutText($"Memory: {w * h * ch / 1024.0 / 1024.0:F2} MB", new CvPoint(20, (int)(90 * (w / 640.0) + 35)), font, CvColor.White);
+
+                    // Marshal native image to GDI+ Bitmap
+                    bitmap = BitmapConverter.ToBitmap(ipl);
                 }
             }
 
             var old = pictureBox.Image;
             pictureBox.Image = bitmap;
             old?.Dispose();
+
+            pbMagnifier.Invalidate();
 
             frameCounter++;
             if (fpsWatch.ElapsedMilliseconds >= 1000)

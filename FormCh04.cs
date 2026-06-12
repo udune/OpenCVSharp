@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
@@ -31,6 +32,7 @@ namespace OpenCVSharp
 
         private readonly Button btnCheckAnswers = new Button();
         private readonly Button btnGoToPlayback = new Button();
+        private readonly PictureBox picDiagram = new PictureBox();
 
         // --- Playback Tab ---
         private readonly PictureBox pbPlay = new PictureBox();
@@ -38,9 +40,11 @@ namespace OpenCVSharp
         private readonly Button btnPlayStart = new Button();
         private readonly Button btnPlayPause = new Button();
         private readonly Button btnPlayStop = new Button();
+        private readonly Button btnScreenshot = new Button(); // Snapshot Capture
         private readonly TrackBar trackFrame = new TrackBar();
         private readonly NumericUpDown nudPlayInterval = new NumericUpDown();
         private readonly Label lblPlayFrameInfo = new Label();
+        private readonly Label lblPlayLag = new Label(); // Frame Sync / Lag status
         private readonly Label lblPlayStatus = new Label();
         private readonly Timer playTimer = new Timer();
         private CvCapture playCapture;
@@ -48,7 +52,6 @@ namespace OpenCVSharp
         private int playTotalFrames;
         private double playFps;
         private bool isTracking;
-        private readonly PictureBox picDiagram = new PictureBox();
 
         // --- Record Tab ---
         private readonly PictureBox pbRec = new PictureBox();
@@ -106,35 +109,37 @@ namespace OpenCVSharp
             tabTheory.Controls.Add(lblTitle);
 
             // Theory Text Box
-            var txtTheoryText = new TextBox
+            var txtTheoryText = new RichTextBox
             {
                 Multiline = true,
                 ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
+                ScrollBars = RichTextBoxScrollBars.Vertical,
                 Location = new Point(20, 60),
                 Size = new Size(550, 280),
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.FromArgb(252, 252, 248),
-                Font = new Font("Malgun Gothic", 10F),
-                Text = "■ [동영상 압축 풀기 및 재생 (CvCapture.FromFile)]\r\n" +
-                       "우리가 보는 동영상 파일(mp4, avi 등)은 컴퓨터 하드디스크 용량을 아끼기 위해 사진 수천 장을 꽉꽉 쪼그려뜨려서 압축(코덱 사용)한 뒤 상자(파일)에 포장해 둔 것입니다.\r\n" +
-                       "  - 비디오 상자 열기: playCapture = CvCapture.FromFile(filepath);\r\n" +
-                       "  - FromFile()은 동영상 파일을 열어 사진 압축을 풀 준비를 하는 함수입니다.\r\n" +
-                       "  - 재생 원리: 타이머 주기에 맞춰 QueryFrame()을 계속 호출하면, 압축이 풀려 나타난 깨끗한 사진 한 장(IplImage)을 순서대로 가져와 비트맵으로 바꾼 뒤 눈앞에 연속해서 띄워 줍니다.\r\n\r\n" +
-                       "※ 내가 원하는 장면으로 이동하기 (Seek):\r\n" +
-                       "  - 트랙바를 마우스로 잡고 끌면, `capture.SetCaptureProperty(CaptureProperty.PosFrames, frameIndex)` 함수를 통해 카메라 읽기 헤드를 내가 지정한 프레임 번호 위치로 순간 이동(Seek) 시킬 수 있습니다.\r\n\r\n" +
-                       "--------------------------------------------------\r\n\r\n" +
-                       "■ [사진들을 엮어서 비디오 파일로 만들기 (CvVideoWriter)]\r\n" +
-                       "카메라나 실습 화면의 연속된 정지 사진들을 엮어서 하나의 완성된 비디오 파일로 만드는 기술입니다.\r\n" +
-                       "  - 저장 준비: writer = new CvVideoWriter(경로, 코덱종류, FPS, 크기);\r\n" +
-                       "    - 코덱종류: XVID, DIVX, MJPG 등 4글자의 압축 알고리즘 기법 이름(FourCC)을 지정합니다.\r\n" +
-                       "    - FPS / 크기: 완성할 동영상의 속도(예: 30 FPS)와 화면 해상도 정보를 줍니다.\r\n" +
-                       "  - 프레임 주입: writer.WriteFrame(iplImage) 함수로 매 순간의 사진을 비디오 스트림에 하나씩 밀어 넣습니다.\r\n\r\n" +
-                       "※ 주의: 다 만들었으면 꼭 상자 뚜껑 닫기 (Dispose)\r\n" +
-                       "  - 녹화가 다 끝나면 반드시 `writer.Dispose()`를 실행해 상자 파일의 뚜껑을 꽉 닫아 줘야 합니다.\r\n" +
-                       "  - 뚜껑을 닫을 때 비디오 파일 내부의 헤더 정보(재생 시간, 규격 등)와 색인이 최종 기록되는데, 만약 닫지 않고 강제 종료하면 재생되지 않는 빈 깡통 파일(0바이트 등)이 남게 됩니다."
-             };
+                Font = new Font("Malgun Gothic", 10F)
+            };
             tabTheory.Controls.Add(txtTheoryText);
+
+            string theoryText = "■ [동영상 압축 풀기 및 재생 (CvCapture.FromFile)]\r\n" +
+                               "우리가 보는 동영상 파일(mp4, avi 등)은 컴퓨터 하드디스크 용량을 아끼기 위해 사진 수천 장을 꽉꽉 쪼그려뜨려서 압축(코덱 사용)한 뒤 상자(파일)에 포장해 둔 것입니다.\r\n" +
+                               "  - 비디오 상자 열기: `playCapture = CvCapture.FromFile(filepath);`\r\n" +
+                               "  - **FromFile()**은 동영상 파일을 열어 사진 압축을 풀 준비를 하는 함수입니다.\r\n" +
+                               "  - 재생 원리: 타이머 주기에 맞춰 QueryFrame()을 계속 호출하면, 압축이 풀려 나타난 깨끗한 사진 한 장(IplImage)을 순서대로 가져와 비트맵으로 바꾼 뒤 눈앞에 연속해서 띄워 줍니다.\r\n\r\n" +
+                               "※ **내가 원하는 장면으로 이동하기 (Seek)**:\r\n" +
+                               "  - 트랙바를 마우스로 잡고 끌면, `capture.SetCaptureProperty(CaptureProperty.PosFrames, frameIndex)` 함수를 통해 카메라 읽기 헤드를 내가 지정한 프레임 번호 위치로 순간 이동(Seek) 시킬 수 있습니다.\r\n\r\n" +
+                               "--------------------------------------------------\r\n\r\n" +
+                               "■ [사진들을 엮어서 비디오 파일로 만들기 (CvVideoWriter)]\r\n" +
+                               "카메라나 실습 화면의 연속된 정지 사진들을 엮어서 하나의 완성된 비디오 파일로 만드는 기술입니다.\r\n" +
+                               "  - 저장 준비: `writer = new CvVideoWriter(경로, 코덱종류, FPS, 크기);`\r\n" +
+                               "    - **코덱종류**: XVID, DIVX, MJPG 등 4글자의 압축 알고리즘 기법 이름(**FourCC**)을 지정합니다.\r\n" +
+                               "    - **FPS / 크기**: 완성할 동영상의 속도(예: 30 FPS)와 화면 해상도 정보를 줍니다.\r\n" +
+                               "  - 프레임 주입: `writer.WriteFrame(iplImage)` 함수로 매 순간의 사진을 비디오 스트림에 하나씩 밀어 넣습니다.\r\n\r\n" +
+                               "※ **주의: 다 만들었으면 꼭 상자 뚜껑 닫기 (Dispose)**\r\n" +
+                               "  - 녹화가 다 끝나면 반드시 `writer.Dispose()`를 실행해 상자 파일의 뚜껑을 꽉 닫아 줘야 합니다.\r\n" +
+                               "  - 뚜껑을 닫을 때 비디오 파일 내부의 헤더 정보(재생 시간, 규격 등)와 색인이 최종 기록되는데, 만약 닫지 않고 강제 종료하면 재생되지 않는 빈 깡통 파일(0바이트 등)이 남게 됩니다.";
+            RichTextHelper.SetMarkdown(txtTheoryText, theoryText);
 
             // Quiz Section Panel
             var pnlQuiz = new Panel
@@ -279,22 +284,24 @@ namespace OpenCVSharp
             }
             tabTheory.Controls.Add(picDiagram);
 
-            var txtDiagramDesc = new TextBox
+            var txtDiagramDesc = new RichTextBox
             {
                 Multiline = true,
                 ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
+                ScrollBars = RichTextBoxScrollBars.Vertical,
                 Location = new Point(590, 535),
                 Size = new Size(580, 150),
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.FromArgb(250, 250, 252),
-                Font = new Font("Malgun Gothic", 9.5F),
-                Text = "【인포그래픽 설명】\r\n" +
-                       "1. 동영상 디코딩(재생) 파이프라인: 파일로부터 데이터를 로드(FromFile)하여 디코더를 초기화합니다. 이후 프레임을 순차적으로 읽고(QueryFrame), 비트맵으로 변환해 화면에 렌더링(Show)하는 주기를 거칩니다. PosFrames 제어로 임의의 프레임 위치로 이동(Seek)할 수도 있습니다.\r\n" +
-                       "2. 동영상 인코딩(저장) 파이프라인: 저장 대상 파일명, 코덱(FourCC), FPS, 프레임 해상도를 지정해 VideoWriter 인코더를 초기화합니다. 가공 및 리사이징된 이미지를 스트림에 연속으로 기록(WriteFrame)하고, 녹화가 끝나면 반드시 해제(Dispose)를 거쳐 완성합니다.\r\n" +
-                       "3. 주의사항: 인코더를 수동으로 닫아주지(Dispose) 않으면, 비디오 파일의 메타데이터와 프레임 인덱스 목록이 올바르게 하드디스크에 써지지 않아 재생이 불가능한 손상된 0바이트 파일이 남습니다."
+                Font = new Font("Malgun Gothic", 9.5F)
             };
             tabTheory.Controls.Add(txtDiagramDesc);
+
+            string diagramDesc = "【인포그래픽 설명】\r\n" +
+                                 "1. **동영상 디코딩(재생) 파이프라인**: 파일로부터 데이터를 로드(FromFile)하여 디코더를 초기화합니다. 이후 프레임을 순차적으로 읽고(QueryFrame), 비트맵으로 변환해 화면에 렌더링(Show)하는 주기를 거칩니다. PosFrames 제어로 임의의 프레임 위치로 이동(Seek)할 수도 있습니다.\r\n" +
+                                 "2. **동영상 인코딩(저장) 파이프라인**: 저장 대상 파일명, 코덱(FourCC), FPS, 프레임 해상도를 지정해 VideoWriter 인코더를 초기화합니다. 가공 및 리사이징된 이미지를 스트림에 연속으로 기록(WriteFrame)하고, 녹화가 끝나면 반드시 해제(Dispose)를 거쳐 완성합니다.\r\n" +
+                                 "3. **주의사항**: 인코더를 수동으로 닫아주지(Dispose) 않으면, 비디오 파일의 메타데이터와 프레임 인덱스 목록이 올바르게 하드디스크에 써지지 않아 재생이 불가능한 손상된 0바이트 파일이 남습니다.";
+            RichTextHelper.SetMarkdown(txtDiagramDesc, diagramDesc);
         }
 
         private void BtnCheckAnswers_Click(object sender, EventArgs e)
@@ -356,16 +363,24 @@ namespace OpenCVSharp
             tabPlayback.Controls.Add(trackFrame);
 
             lblPlayFrameInfo.Location = new Point(20, 500);
-            lblPlayFrameInfo.Size = new Size(700, 25);
+            lblPlayFrameInfo.Size = new Size(700, 22);
             lblPlayFrameInfo.Font = new Font("Malgun Gothic", 9.75F, FontStyle.Bold);
             lblPlayFrameInfo.Text = "프레임: 0 / 0 (00:00:00 / 00:00:00)";
             tabPlayback.Controls.Add(lblPlayFrameInfo);
+
+            lblPlayLag.Location = new Point(20, 525);
+            lblPlayLag.Size = new Size(700, 20);
+            lblPlayLag.Font = new Font("Malgun Gothic", 9F, FontStyle.Bold);
+            lblPlayLag.ForeColor = Color.DarkSlateGray;
+            lblPlayLag.Text = "배속 설정: 1.00x | 디코딩+렌더링 시간: 0.0ms";
+            tabPlayback.Controls.Add(lblPlayLag);
 
             var panel = new Panel
             {
                 Location = new Point(740, 20),
                 Size = new Size(330, 540),
-                BorderStyle = BorderStyle.FixedSingle
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.White
             };
             tabPlayback.Controls.Add(panel);
 
@@ -412,6 +427,15 @@ namespace OpenCVSharp
             btnPlayStop.Enabled = false;
             btnPlayStop.Click += BtnPlayStop_Click;
             panel.Controls.Add(btnPlayStop);
+            y += 42;
+
+            // Snapshot screenshot button
+            btnScreenshot.Text = "📸 현재 프레임 캡처 (스냅샷 저장)";
+            btnScreenshot.Location = new Point(15, y);
+            btnScreenshot.Size = new Size(290, 32);
+            btnScreenshot.Enabled = false;
+            btnScreenshot.Click += BtnScreenshot_Click;
+            panel.Controls.Add(btnScreenshot);
             y += 45;
 
             addHeader("3. 재생 속도 조절 (Interval, ms)");
@@ -432,25 +456,29 @@ namespace OpenCVSharp
             lblPlayStatus.Padding = new Padding(5);
             lblPlayStatus.Text = "상태: 파일 대기 중";
             panel.Controls.Add(lblPlayStatus);
-            y += 60;
+            y += 55;
 
-            panel.Controls.Add(new TextBox
+            var txtTheory = new RichTextBox
             {
                 Multiline = true,
                 ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
+                ScrollBars = RichTextBoxScrollBars.Vertical,
                 Location = new Point(15, y),
-                Size = new Size(290, 180),
+                Size = new Size(290, 160),
                 BorderStyle = BorderStyle.Fixed3D,
                 BackColor = Color.WhiteSmoke,
-                Text = "【핵심 이론 및 원리】\r\n" +
-                       "1. 동영상 읽기: CvCapture.FromFile(path)\r\n" +
-                       "   - 동영상 컨테이너(mp4, avi)를 열어 디코딩합니다.\r\n" +
-                       "2. 재생 원리: Timer 루프 + QueryFrame()\r\n" +
-                       "   - 지정된 Interval마다 디코더로부터 프레임을 가져와 비트맵으로 렌더링합니다.\r\n" +
-                       "3. 위치 이동(Seek): SetCaptureProperty(..)\r\n" +
-                       "   - CaptureProperty.PosFrames 속성을 수정해 재생 헤드를 임의의 프레임 위치로 이동시킵니다."
-            });
+                Font = new Font("Malgun Gothic", 8.5F)
+            };
+            panel.Controls.Add(txtTheory);
+
+            string theorySummaryText = "【핵심 이론 및 원리】\r\n" +
+                                       "1. **동영상 디코딩**: `CvCapture.FromFile(path)`\r\n" +
+                                       "   - 동영상 압축 파일 포장을 해독하여 프레임을 풀어놓습니다.\r\n" +
+                                       "2. **프레임 위치 이동(Seek)**\r\n" +
+                                       "   - **PosFrames** 속성에 원하는 인덱스를 부여하면 헤드가 즉시 해당 프레임으로 탐색(Seek)됩니다.\r\n" +
+                                       "3. **프레임 캡처 스냅샷**\r\n" +
+                                       "   - 동영상에서 특정 정지 프레임을 잡은 뒤 `Cv.SaveImage()`를 호출하여 개별 이미지 파일로 직접 내보낼 수 있습니다.";
+            RichTextHelper.SetMarkdown(txtTheory, theorySummaryText);
 
             playTimer.Tick += PlayTimer_Tick;
         }
@@ -466,7 +494,6 @@ namespace OpenCVSharp
             }
         }
 
-        // OpenCV 2.4 FFmpeg does not support H.265/HEVC. Scan file start+end for hvc1/hev1 codec box.
         private static bool IsHevcVideo(string filePath)
         {
             const int scanSize = 65536;
@@ -521,7 +548,6 @@ namespace OpenCVSharp
                     return;
                 }
 
-                // OpenCV 2.4 does not support Unicode paths on Windows — copy to ASCII temp path
                 string pathToOpen = filepath;
                 foreach (char c in filepath)
                 {
@@ -536,7 +562,6 @@ namespace OpenCVSharp
                     }
                 }
 
-                // OpenCV C/C++ path parser prefers forward slashes
                 pathToOpen = pathToOpen.Replace('\\', '/');
 
                 playCapture = CvCapture.FromFile(pathToOpen);
@@ -550,7 +575,6 @@ namespace OpenCVSharp
                     return;
                 }
 
-                // Verify the video can actually be decoded
                 var testFrame = playCapture.QueryFrame();
                 if (testFrame == null)
                 {
@@ -580,6 +604,7 @@ namespace OpenCVSharp
                 btnPlayStart.Enabled = true;
                 btnPlayPause.Enabled = false;
                 btnPlayStop.Enabled = true;
+                btnScreenshot.Enabled = true;
 
                 lblPlayStatus.Text = $"파일명: {Path.GetFileName(filepath)}\nFPS: {playFps:F2} / 총 {playTotalFrames} 프레임";
                 UpdatePlayFrameInfo(0);
@@ -631,6 +656,7 @@ namespace OpenCVSharp
             btnPlayStart.Enabled = false;
             btnPlayPause.Enabled = true;
             btnPlayStop.Enabled = true;
+            btnScreenshot.Enabled = true;
             lblPlayStatus.Text = "상태: 재생 중";
         }
 
@@ -639,6 +665,7 @@ namespace OpenCVSharp
             playTimer.Stop();
             btnPlayStart.Enabled = true;
             btnPlayPause.Enabled = false;
+            btnScreenshot.Enabled = true;
             lblPlayStatus.Text = "상태: 일시 정지";
         }
 
@@ -659,16 +686,47 @@ namespace OpenCVSharp
             btnPlayStart.Enabled = false;
             btnPlayPause.Enabled = false;
             btnPlayStop.Enabled = false;
+            btnScreenshot.Enabled = false;
             lblPlayStatus.Text = "상태: 정지됨";
             lblPlayFrameInfo.Text = "프레임: 0 / 0 (00:00:00 / 00:00:00)";
+            lblPlayLag.Text = "배속 설정: 1.00x | 디코딩+렌더링 시간: 0.0ms";
             CleanupTempFile();
+        }
+
+        private void BtnScreenshot_Click(object sender, EventArgs e)
+        {
+            if (playCapture == null) return;
+            try
+            {
+                double currentPos = playCapture.GetCaptureProperty(CaptureProperty.PosFrames);
+                double targetPos = Math.Max(0, currentPos - 1);
+                playCapture.SetCaptureProperty(CaptureProperty.PosFrames, targetPos);
+                var ipl = playCapture.QueryFrame();
+                playCapture.SetCaptureProperty(CaptureProperty.PosFrames, currentPos); // restore
+
+                if (ipl != null)
+                {
+                    string filename = $"Snapshot_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+                    string savePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, filename);
+                    
+                    // Save image natively via OpenCV
+                    Cv.SaveImage(savePath, ipl);
+                    MessageBox.Show($"[OpenCV Cv.SaveImage] 현재 프레임을 스크린샷 파일로 저장했습니다:\n{filename}", "스냅샷 저장 성공", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("프레임 스크린샷 저장 실패: " + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void PlayTimer_Tick(object sender, EventArgs e)
         {
             if (playCapture == null || isTracking) return;
 
-            // Query frame first — correctly detects end-of-video even when FrameCount == 0
+            var sw = new Stopwatch();
+            sw.Start();
+
             var ipl = playCapture.QueryFrame();
             if (ipl == null)
             {
@@ -681,9 +739,29 @@ namespace OpenCVSharp
             pbPlay.Image = BitmapConverter.ToBitmap(ipl);
             old?.Dispose();
 
+            sw.Stop();
+            double processTime = sw.Elapsed.TotalMilliseconds;
+
             int currentFrame = (int)playCapture.GetCaptureProperty(CaptureProperty.PosFrames);
             trackFrame.Value = Math.Min(currentFrame, trackFrame.Maximum);
             UpdatePlayFrameInfo(currentFrame);
+
+            // Calculate Speed Ratio and Latency warning
+            double targetInterval = (double)nudPlayInterval.Value;
+            double originalInterval = playFps > 0 ? 1000.0 / playFps : 33.3;
+            double speedRatio = originalInterval / targetInterval;
+
+            string lagWarning = "";
+            if (processTime > targetInterval)
+            {
+                lagWarning = $" [⚠️ 프레임 지연 {processTime - targetInterval:F1}ms]";
+                lblPlayLag.ForeColor = Color.Red;
+            }
+            else
+            {
+                lblPlayLag.ForeColor = Color.DarkSlateGray;
+            }
+            lblPlayLag.Text = $"배속 설정: {speedRatio:F2}x | 디코딩+렌더링 시간: {processTime:F1}ms / 목표 {targetInterval:F1}ms{lagWarning}";
 
             if (playTotalFrames > 0 && currentFrame >= playTotalFrames)
             {
@@ -715,7 +793,8 @@ namespace OpenCVSharp
             {
                 Location = new Point(740, 20),
                 Size = new Size(330, 540),
-                BorderStyle = BorderStyle.FixedSingle
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.White
             };
             tabRecord.Controls.Add(panel);
 
@@ -755,7 +834,7 @@ namespace OpenCVSharp
             cmbRecCodec.Location = new Point(15, y);
             cmbRecCodec.Size = new Size(290, 25);
             cmbRecCodec.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbRecCodec.Items.AddRange(new object[] { "XVID (AVI)", "DIB / Raw (AVI)", "MJPG (AVI)" });
+            cmbRecCodec.Items.AddRange(new object[] { "XVID (MPEG-4 AVI)", "DIB / Raw (Uncompressed)", "MJPG (Motion JPEG)" });
             cmbRecCodec.SelectedIndex = 2;
             panel.Controls.Add(cmbRecCodec);
             y += 45;
@@ -786,40 +865,45 @@ namespace OpenCVSharp
             y += 55;
 
             lblRecInfo.Location = new Point(15, y);
-            lblRecInfo.Size = new Size(290, 20);
-            lblRecInfo.Font = new Font("Malgun Gothic", 9F, FontStyle.Bold);
-            lblRecInfo.Text = "저장 프레임 수: 0 | 크기: 0 KB";
+            lblRecInfo.Size = new Size(290, 75);
+            lblRecInfo.Font = new Font("Consolas", 8.5F, FontStyle.Bold);
+            lblRecInfo.ForeColor = Color.DarkSlateBlue;
+            lblRecInfo.Text = "프레임 수: 0 (0.0초)\n용량: 0 KB (0.00 MB)\n전송률: 0.0 KB/s\n1분 예상 크기: 0.0 MB";
             panel.Controls.Add(lblRecInfo);
-            y += 30;
+            y += 85;
 
-            panel.Controls.Add(new TextBox
+            var txtTheory = new RichTextBox
             {
                 Multiline = true,
                 ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
+                ScrollBars = RichTextBoxScrollBars.Vertical,
                 Location = new Point(15, y),
                 Size = new Size(290, 150),
                 BorderStyle = BorderStyle.Fixed3D,
                 BackColor = Color.WhiteSmoke,
-                Text = "【핵심 이론 및 원리】\r\n" +
-                       "1. 파일 작성: CvVideoWriter(path, codec, fps, size)\r\n" +
-                       "   - 지정된 코덱(예: MJPG, XVID), 속도, 크기로 출력 동영상 스트림 파일을 초기화합니다.\r\n" +
-                       "2. 프레임 주입: WriteFrame(iplImage)\r\n" +
-                       "   - 매 캡처 프레임을 라이터 객체에 써넣습니다.\r\n" +
-                       "3. 최종 저장: Dispose() 필수!\r\n" +
-                       "   - 라이터 객체를 닫을 때 파일 헤더 정보와 인덱스가 완전하게 기록되어 재생 가능한 정상 비디오가 됩니다."
-            });
+                Font = new Font("Malgun Gothic", 8.5F)
+            };
+            panel.Controls.Add(txtTheory);
+
+            string theoryRecText = "【핵심 이론 및 원리】\r\n" +
+                                   "1. **비디오 인코딩**: `CvVideoWriter(path, codec, fps, size)`\r\n" +
+                                   "   - 파일명과 압축 알고리즘(**FourCC**), 속도, 크기를 지정하여 파일 스트림을 엽니다.\r\n" +
+                                   "2. **코덱 성능 분석**\r\n" +
+                                   "   - **XVID / MJPG**: 프레임 단위 또는 블록 단위로 픽셀을 고속 압축하여 저용량 비디오를 생성합니다.\r\n" +
+                                   "   - **DIB (Raw)**: 압축하지 않고 원본 픽셀 배열을 그대로 저장하여 무지막지한 파일 크기가 소모됩니다.\r\n" +
+                                   "3. **저장 완료**: `Dispose()` 필수!\r\n" +
+                                   "   - 소멸자 호출 시 파일 컨테이너 헤더가 최종 마감 기록됩니다.";
+            RichTextHelper.SetMarkdown(txtTheory, theoryRecText);
 
             tabRecord.Controls.Add(new TextBox
             {
-                Text = "실습 가이드: 녹화 시작 시 대화상자에서 저장할 경로를 정한 후 녹화를 시작할 수 있습니다.",
-                Location = new Point(20, 520),
-                Size = new Size(720, 45),
-                Multiline = true,
+                Text = "실습 가이드: 녹화 시작 시 대화상자에서 저장할 경로를 지정하고 녹화를 해보며 코덱별 용량 팽창율 차이를 분석하세요.",
+                Location = new Point(20, 680),
+                Size = new Size(720, 25),
                 ReadOnly = true,
-                BorderStyle = BorderStyle.FixedSingle,
-                BackColor = Color.LightYellow,
-                Font = new Font("Malgun Gothic", 9.5F)
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(248, 240, 244),
+                Font = new Font("Malgun Gothic", 9.5F, FontStyle.Bold)
             });
 
             recTimer.Interval = 33;
@@ -949,10 +1033,22 @@ namespace OpenCVSharp
 
             recFrameCount++;
 
+            // Calculate Real-Time file size and bitrate
             long fileSizeKB = 0;
             if (File.Exists(recFilePath))
-                fileSizeKB = new FileInfo(recFilePath).Length / 1024;
-            lblRecInfo.Text = $"저장 프레임 수: {recFrameCount} | 크기: {fileSizeKB:N0} KB";
+            {
+                var fi = new FileInfo(recFilePath);
+                fileSizeKB = fi.Length / 1024;
+            }
+
+            double seconds = recFrameCount / 30.0;
+            double kbPerSecond = seconds > 0 ? fileSizeKB / seconds : 0;
+            double projectedOneMinMB = (kbPerSecond * 60.0) / 1024.0;
+
+            lblRecInfo.Text = $"저장 프레임 수: {recFrameCount} ({seconds:F1}초)\n" +
+                             $"용량: {fileSizeKB:N0} KB ({fileSizeKB / 1024.0:F2} MB)\n" +
+                             $"초당 전송률: {kbPerSecond:F1} KB/s\n" +
+                             $"1분 녹화 시 예상 크기: {projectedOneMinMB:F1} MB";
         }
 
         private string GetImagePath(string filename)
