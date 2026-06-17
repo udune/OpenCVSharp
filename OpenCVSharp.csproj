@@ -86,6 +86,9 @@
     <Compile Include="FormCh06.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="FormCh07.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="OpenCV_CLASS.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="RichTextHelper.cs" />
@@ -124,6 +127,8 @@
     <Content Include="ref\005 이미지 파일 출력.png" />
     <Content Include="ref\006 클래스 생성 &amp; GrayScale.png" />
     <Content Include="ch06_class_grayscale_ko.png" />
+    <Content Include="ref\007 IplImage.png" />
+    <Content Include="ch07_iplimage_ko.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

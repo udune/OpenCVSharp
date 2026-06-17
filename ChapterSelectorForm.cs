@@ -10,7 +10,7 @@ namespace OpenCVSharp
         {
             Text = "OpenCVSharp 실습 챕터 선택";
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(380, 325);
+            ClientSize = new Size(380, 375);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
 
@@ -67,12 +67,22 @@ namespace OpenCVSharp
             };
             btnCh06.Click += (s, e) => OpenChapter(() => new FormCh06());
 
+            var btnCh07 = new Button
+            {
+                Text = "007. IplImage 구조의 이해 실습",
+                Font = new Font("Malgun Gothic", 9.75F, FontStyle.Regular),
+                Size = new Size(340, 42),
+                Location = new Point(20, 310)
+            };
+            btnCh07.Click += (s, e) => OpenChapter(() => new FormCh07());
+
             Controls.Add(lblTitle);
             Controls.Add(btnCh02);
             Controls.Add(btnCh03);
             Controls.Add(btnCh04);
             Controls.Add(btnCh05);
             Controls.Add(btnCh06);
+            Controls.Add(btnCh07);
         }
 
         private void OpenChapter(Func<Form> formFactory)
