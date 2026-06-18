@@ -10,7 +10,7 @@ namespace OpenCVSharp
         {
             Text = "OpenCVSharp 실습 챕터 선택";
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(380, 375);
+            ClientSize = new Size(380, 425);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
 
@@ -76,6 +76,15 @@ namespace OpenCVSharp
             };
             btnCh07.Click += (s, e) => OpenChapter(() => new FormCh07());
 
+            var btnCh08 = new Button
+            {
+                Text = "008. 색상 반전 & Binary 실습",
+                Font = new Font("Malgun Gothic", 9.75F, FontStyle.Regular),
+                Size = new Size(340, 42),
+                Location = new Point(20, 360)
+            };
+            btnCh08.Click += (s, e) => OpenChapter(() => new FormCh08());
+
             Controls.Add(lblTitle);
             Controls.Add(btnCh02);
             Controls.Add(btnCh03);
@@ -83,6 +92,7 @@ namespace OpenCVSharp
             Controls.Add(btnCh05);
             Controls.Add(btnCh06);
             Controls.Add(btnCh07);
+            Controls.Add(btnCh08);
         }
 
         private void OpenChapter(Func<Form> formFactory)
